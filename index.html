@@ -1,0 +1,1713 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>PDF Merger Pro - Editor Integrado e Persistente (V12 - Fixes)</title>
+
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+    font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;
+    background:linear-gradient(135deg,#1e3c72,#2a5298,#7e22ce);
+    padding:20px;min-height:100vh;
+}
+.container{max-width:1200px;margin:0 auto}
+.card{
+    background:#fff;border-radius:16px;overflow:hidden;
+    box-shadow:0 25px 70px rgba(0,0,0,.25);
+}
+.header{
+    padding:30px;
+    background:linear-gradient(135deg,#667eea,#764ba2);
+    color:#fff;text-align:center;position:relative;
+}
+.header h1{font-size:28px;margin-bottom:8px;font-weight:700}
+.header .subtitle{opacity:.95;font-size:14px}
+.toolbar{
+    padding:20px;background:#f8f9fa;border-bottom:1px solid #e9ecef;
+    display:flex;gap:12px;flex-wrap:wrap;justify-content:center;align-items:center;
+}
+.btn{
+    background:linear-gradient(135deg,#667eea,#764ba2);
+    color:#fff;border:none;padding:11px 20px;border-radius:10px;
+    font-size:14px;font-weight:600;cursor:pointer;
+    transition:all .2s;display:inline-flex;align-items:center;gap:8px;
+    box-shadow:0 4px 12px rgba(102,126,234,.3);
+}
+.btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 6px 20px rgba(102,126,234,.4)}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+.btn.secondary{background:linear-gradient(135deg,#6c757d,#495057);box-shadow:0 4px 12px rgba(108,117,125,.3)}
+.btn.danger{background:linear-gradient(135deg,#dc3545,#c82333);box-shadow:0 4px 12px rgba(220,53,69,.3)}
+.btn.success{background:linear-gradient(135deg,#28a745,#218838);box-shadow:0 4px 12px rgba(40,167,69,.3)}
+.content{padding:25px}
+.upload-zone{
+    border:3px dashed #667eea;border-radius:14px;
+    padding:40px 20px;text-align:center;background:#f8f9ff;
+    cursor:pointer;transition:.2s;margin-bottom:25px;
+}
+.upload-zone.dragover{background:#e8ebff;transform:scale(1.02);border-color:#5568d3}
+.upload-zone .icon{font-size:48px;margin-bottom:15px;opacity:.7}
+.upload-zone .text{font-size:18px;font-weight:600;color:#333;margin-bottom:8px}
+.upload-zone .subtext{font-size:14px;color:#666}
+.pdf-grid{
+    display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+    gap:18px;margin-top:20px;
+}
+.pdf-card{
+    background:#fff;border:2px solid #e9ecef;border-radius:12px;
+    padding:15px;transition:.2s;cursor:move;position:relative;
+    box-shadow:0 2px 8px rgba(0,0,0,.08);
+}
+.pdf-card:hover{border-color:#667eea;box-shadow:0 4px 16px rgba(102,126,234,.15)}
+.pdf-card.dragging{opacity:.5;transform:scale(.95)}
+.restricted-badge{
+    position:absolute;top:10px;right:10px;
+    background:#ffe6e6;color:#b02a37;
+    padding:6px;border-radius:8px;
+    font-weight:700;font-size:12px;z-index:1;
+}
+.file-type-badge{
+    position:absolute;top:10px;right:10px;
+    background:#e6f3ff;color:#2a5298;
+    padding:6px;border-radius:8px;
+    font-weight:700;font-size:12px;z-index:1;
+    text-transform: uppercase;
+}
+.pdf-preview{
+    width:100%;height:160px;background:#f8f9fa;
+    border-radius:8px;margin-bottom:12px;
+    display:flex;align-items:center;justify-content:center;
+    border:1px solid #dee2e6;overflow:hidden;position:relative;
+}
+.pdf-preview canvas{max-width:100%;max-height:100%;border-radius:6px;box-shadow:0 0 5px rgba(0,0,0,.1);}
+.pdf-preview .placeholder{font-size:52px;opacity:.3}
+.pdf-header{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.drag-handle{font-size:20px;color:#adb5bd;cursor:grab}
+.drag-handle:active{cursor:grabbing}
+.pdf-title{
+    font-weight:600;font-size:14px;color:#212529;
+    flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.pdf-meta{
+    display:flex;justify-content:space-between;align-items:center;
+    font-size:13px;color:#6c757d;margin-bottom:12px;
+}
+.pdf-actions{display:flex;gap:8px}
+/* --- continuação do arquivo corrigido (PARTE 2 / ?) --- */
+
+.stats-bar{
+    background:linear-gradient(135deg,#f8f9fa,#e9ecef);
+    padding:15px 20px;border-radius:12px;margin-bottom:20px;
+    display:flex;justify-content:space-around;flex-wrap:wrap;gap:15px;
+}
+.stat{text-align:center}
+.stat-value{font-size:24px;font-weight:700;color:#667eea}
+.stat-label{font-size:12px;color:#6c757d;text-transform:uppercase;margin-top:4px}
+.empty-state{
+    text-align:center;padding:60px 20px;color:#adb5bd;
+}
+.empty-state .icon{font-size:72px;opacity:.4;margin-bottom:15px}
+.empty-state .text{font-size:16px}
+/* Modal e Progress Bar (Mantidos) */
+.modal-backdrop{
+    position:fixed;top:0;left:0;width:100%;height:100%;
+    background:rgba(0,0,0,.6);backdrop-filter:blur(4px);
+    display:none;align-items:center;justify-content:center;z-index:9999;
+}
+.modal{
+    width:90%;max-width:450px;background:white;
+    border-radius:16px;padding:30px;
+    box-shadow:0 25px 70px rgba(0,0,0,.3);
+    animation:modalPop .3s cubic-bezier(0.34,1.56,0.64,1);
+    position: relative; 
+}
+@keyframes modalPop{from{transform:scale(.7);opacity:0}to{transform:scale(1);opacity:1}}
+.modal-icon{font-size:48px;text-align:center;margin-bottom:15px}
+.modal-title{font-size:22px;font-weight:700;margin-bottom:12px;color:#212529;text-align:center}
+.modal-msg{font-size:15px;margin-bottom:25px;color:#495057;text-align:center;line-height:1.5}
+.modal-btn{
+    background:#667eea;color:#fff;border:none;
+    padding:12px 24px;border-radius:10px;cursor:pointer;
+    font-size:15px;font-weight:600;width:100%;transition:.2s;
+}
+.modal-btn:hover{background:#5568d3;transform:translateY(-1px)}
+.range-input{
+    width:100%;padding:12px;border:2px solid #e9ecef;
+    border-radius:8px;font-size:14px;margin-bottom:15px;
+}
+.range-input:focus{outline:none;border-color:#667eea}
+.range-help{font-size:13px;color:#6c757d;margin-bottom:15px;line-height:1.4}
+.progress-bar{
+    width:100%;height:8px;background:#e9ecef;
+    border-radius:4px;overflow:hidden;margin-bottom:15px;
+}
+.progress-fill{
+    height:100%;background:linear-gradient(90deg,#667eea,#764ba2);
+    transition:width .3s;border-radius:4px;
+}
+/* Estilos específicos para o Modal de Formato */
+.format-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr); 
+    gap: 10px;
+}
+.format-btn {
+    padding: 15px 10px;
+    background: #f8f9fa;
+    color: #495057;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all .2s;
+    text-align: center;
+}
+.format-btn:hover {
+    background: #e9ecef;
+    border-color: #667eea;
+}
+.format-btn span {
+    display: block;
+    font-size: 24px;
+    margin-bottom: 5px;
+}
+/* Estilos para o novo Modal de Edição (Preview) */
+.modal.large-modal {
+    max-width: 90%; 
+    width: 1100px;
+}
+#editorTableBody td {
+    padding: 10px;
+    border: 1px solid #ddd;
+    vertical-align: top;
+}
+#editorTableBody td[contenteditable="true"] {
+    cursor: text;
+    background-color: #fffde7;
+    min-height: 50px;
+    white-space: pre-wrap; 
+}
+.row-selected {
+    background-color: #e3f2fd !important;
+}
+
+@media(max-width:768px){
+    .pdf-grid{grid-template-columns:1fr}
+    .toolbar{justify-content:stretch}
+    .toolbar .btn{flex:1;justify-content:center}
+    .format-grid{grid-template-columns: 1fr;} 
+    .modal.large-modal {max-width: 95%;}
+    .format-btn.secondary{grid-column: 1 / 4 !important;} 
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+    <div class="card">
+        <div class="header">
+            <h1>📑 PDF Merger Pro - Editor Integrado (V12)</h1>
+            <div class="subtitle">Juntador Profissional de PDFs (Persistência, A4, Duplicatas e Editor In-line)</div>
+        </div>
+
+        <div class="toolbar">
+            <button class="btn" id="choosePdfBtn">📁 Adicionar PDFs</button>
+            <button class="btn secondary" id="chooseDataBtn">📄 Importar Dados (TXT, CSV, JSON)</button>
+            <button class="btn secondary" id="clearBtn" disabled>🗑️ Limpar</button>
+            <button class="btn secondary" id="reverseBtn" disabled>🔄 Inverter</button>
+            <button class="btn secondary" id="exportBtn" disabled>📋 Prévia/Exportar Dados</button>
+            <button class="btn success" id="mergeBtn" disabled>✨ Combinar só PDFs</button>
+        </div>
+
+        <div class="content">
+            <div id="uploadZone" class="upload-zone">
+                <div class="icon">📥</div>
+                <div class="text">Arraste seus arquivos aqui (PDF, TXT, CSV, JSON)</div>
+                <div class="subtext">permitido selecionar múltiplos arquivos</div>
+                <input id="fileInputPdf" type="file" accept="application/pdf" multiple hidden />
+                <input id="fileInputData" type="file" accept=".txt, .csv, .tsv, application/json" multiple hidden />
+            </div>
+            
+            <div id="restoreNotice" class="stats-bar" style="display:none; background: #fff3cd; border: 1px solid #ffeeba;">
+                <div style="font-size: 14px; font-weight: 600; color: #856404; text-align: center;">
+                    <span style="font-size: 20px; margin-right: 5px;">⚠️</span> Estado e ordem dos arquivos restaurados. Por favor, **recarregue os PDFs** usando "Adicionar PDFs" para continuar a combinação. Seus dados e edições persistem abaixo.
+                </div>
+            </div>
+
+            <div id="statsBar" class="stats-bar" style="display:none">
+                <div class="stat">
+                    <div class="stat-value" id="statFiles">0</div>
+                    <div class="stat-label">Arquivos Carregados</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="statPages">0</div>
+                    <div class="stat-label">Páginas PDF Total</div>
+                </div>
+                <div class="stat" id="statDataLinesWrapper" style="display:none;">
+                    <div class="stat-value" id="statDataLines">0</div>
+                    <div class="stat-label">Linhas de Dados</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value" id="statSize">0 KB</div>
+                    <div class="stat-label">Tamanho PDF</div>
+                </div>
+            </div>
+
+            <div id="pdfGrid" class="pdf-grid">
+                <div class="empty-state">
+                    <div class="icon">📂</div>
+                    <div class="text">Nenhum PDF ou Dado Carregado</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <footer style="text-align:center;padding:20px;color:rgba(255,255,255,.8);font-size:14px">
+        &copy Peppe 2025
+    </footer>
+</div>
+
+<div id="modalBackdrop" class="modal-backdrop">
+    <div class="modal">
+        <div id="modalIcon" class="modal-icon">⚠️</div>
+        <div id="modalTitle" class="modal-title">Aviso</div>
+        <div id="modalMsg" class="modal-msg">Mensagem</div>
+        <button class="modal-btn" onclick="closeModal()">OK</button>
+    </div>
+</div>
+
+<div id="rangeModal" class="modal-backdrop">
+    <div class="modal">
+        <div class="modal-icon">📄</div>
+        <div class="modal-title">Selecionar Páginas</div>
+        <div id="rangeFileName" style="text-align:center;margin-bottom:15px;font-weight:600;color:#667eea"></div>
+        <div class="range-help">
+            Digite as páginas que deseja manter:<br>
+            <strong>Exemplos:</strong> 1-3, 5, 7-10 ou 1,3,5
+        </div>
+        <input type="text" id="rangeInput" class="range-input" placeholder="Ex: 1-3, 5, 8-10">
+        <div style="display:flex;gap:10px">
+            <button class="modal-btn" style="background:#6c757d" onclick="closeRangeModal()">Cancelar</button>
+            <button class="modal-btn" onclick="applyPageRange()">Aplicar</button>
+        </div>
+    </div>
+</div>
+
+<div id="confirmModal" class="modal-backdrop">
+    <div class="modal">
+        <div class="modal-icon">❓</div>
+        <div class="modal-title" id="confirmTitle">Importar Duplicata?</div>
+        <div class="modal-msg" id="confirmMsg"></div>
+        <div style="display:flex;gap:10px">
+            <button class="modal-btn secondary" style="background:#6c757d" onclick="resolveConfirm(false)">Não</button>
+            <button class="modal-btn" onclick="resolveConfirm(true)">Sim, Importar</button>
+        </div>
+    </div>
+</div>
+
+<div id="exportFormatModal" class="modal-backdrop">
+    <div class="modal">
+        <div class="modal-icon">⬇️</div>
+        <div class="modal-title">Selecione o Formato de Exportação</div>
+        <div class="modal-msg">Os dados exportados serão a versão mais recente **editada** por você.</div>
+        
+        <div class="format-grid">
+            <button class="format-btn" onclick="startExport('pdf')"><span>📄</span> PDF Gerado (.pdf)</button>
+            <button class="format-btn" onclick="startExport('txt')"><span>📄</span> Texto Simples (.txt)</button>
+            <button class="format-btn" onclick="startExport('doc')"><span>📝</span> Word Simples (.doc)</button>
+            <button class="format-btn" onclick="startExport('html')"><span>🌐</span> Tabela Web (.html)</button>
+            <button class="format-btn" onclick="startExport('json')"><span>💾</span> JSON Estruturado (.json)</button>
+            <button class="format-btn" onclick="startExport('csv')"><span>📊</span> CSV para Excel (.csv)</button>
+            <button class="format-btn" onclick="startExport('tsv')"><span>📑</span> TSV (Tabular) (.tsv)</button>
+            <button class="format-btn" onclick="startExport('xlsx')"><span>📈</span> Planilha Excel (.xlsx)</button>
+            <button class="format-btn secondary" style="background:#dc3545; color: white; grid-column: 1 / 4;" onclick="closeExportFormatModal()">Cancelar</button>
+        </div>
+    </div>
+</div>
+
+<div id="editorModal" class="modal-backdrop">
+    <div class="modal large-modal">
+        <button style="position:absolute; top: 15px; right: 15px; background:none; border:none; font-size: 20px; cursor:pointer; color:#6c757d;" onclick="closeEditorModal()">❌</button>
+
+        <div class="modal-title">Prévia e Edição do Conteúdo Extraído</div>
+        <div class="modal-msg">Edite o texto diretamente na tabela. Use "Desfazer/Refazer" para gerenciar as alterações.<br><br><strong style="color:#b02a37">⚠️ Tudo o que for alterado aqui e baixado será baseado nas suas edições. Já o botão <em>Combinar PDFs</em> sempre usa apenas os arquivos PDF originais, sem considerar alterações do editor.</strong></div>
+
+        <div class="editor-toolbar" style="display:flex; gap:10px; margin-bottom:15px; justify-content:flex-end;">
+            <button class="btn secondary" id="undoBtn" disabled>↩️ Desfazer</button>
+            <button class="btn secondary" id="redoBtn" disabled>↪️ Refazer</button>
+            <button class="btn danger" id="deleteRowsBtn" disabled>🗑️ Excluir Linha(s)</button> 
+        </div>
+
+        <div style="overflow-x:auto; max-height: 400px; margin-bottom: 20px;">
+            <table id="editorTable" style="width:100%; border-collapse: collapse; font-size: 14px;">
+                <thead>
+                    <tr style="background-color: #f1f1f1;">
+                        <th style="padding: 10px; border: 1px solid #ddd; width: 40px;"><input type="checkbox" id="selectAllRows"></th>
+                        <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 25%;">Arquivo</th>
+                        <th style="padding: 10px; border: 1px solid #ddd; width: 80px;">Pág.</th>
+                        <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Conteúdo Extraído (Clique para editar)</th>
+                    </tr>
+                </thead>
+                <tbody id="editorTableBody">
+                    </tbody>
+            </table>
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+            <button class="modal-btn secondary" style="flex: 1; background: #dc3545;" onclick="cancelEditorChanges()">❌ Cancelar (Descartar Alterações)</button>
+            <button class="modal-btn secondary" style="flex: 1;" onclick="closeEditorModal()">💾 Salvar e Fechar</button>
+            <button class="modal-btn success" style="flex: 1;" onclick="saveAndExportFromEditor()">⬇️ Exportar</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Configuração do worker do PDF.js
+pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+const { PDFDocument, PageSizes } = PDFLib;
+
+// Dimensões Padrão A4 em pontos
+const A4_DIMENSIONS = PageSizes.A4; 
+
+/* --- Constantes IndexedDB --- */
+const DB_NAME = 'PDFMergerProDB';
+const STORE_NAME = 'AppState';
+
+/* --- Estado Global de Edição de Dados --- */
+// V9: filesToDisplay unifica PDFs e arquivos de dados para ordenação visual
+let filesToDisplay = []; 
+let extractedTableData = []; 
+let initialEditorState = []; 
+let history = []; 
+let historyPointer = -1;
+const MAX_HISTORY = 20;
+const SUPPORTED_DATA_TYPES = ['.txt', '.csv', '.tsv', '.json'];
+
+/* --- Referências DOM (Mantidas) --- */
+const editorModal = document.getElementById('editorModal');
+const editorTableBody = document.getElementById('editorTableBody');
+const undoBtn = document.getElementById('undoBtn');
+const redoBtn = document.getElementById('redoBtn');
+const deleteRowsBtn = document.getElementById('deleteRowsBtn'); 
+const selectAllRows = document.getElementById('selectAllRows');
+const pdfGrid = document.getElementById('pdfGrid'); 
+const reverseBtn = document.getElementById('reverseBtn'); 
+const clearBtn = document.getElementById('clearBtn'); 
+const mergeBtn = document.getElementById('mergeBtn');
+const exportBtn = document.getElementById('exportBtn');
+const exportFormatModal = document.getElementById('exportFormatModal');
+const rangeInput = document.getElementById('rangeInput');
+const fileInputPdf = document.getElementById('fileInputPdf');
+const fileInputData = document.getElementById('fileInputData');
+const restoreNotice = document.getElementById('restoreNotice');
+
+/* --- Utilities (Mantidas) --- */
+function ensureUint8(data){
+  if(data instanceof Uint8Array) return data;
+  return new Uint8Array(data);
+}
+function cloneUint8(u8){
+  return u8 instanceof Uint8Array ? u8.slice() : new Uint8Array(u8).slice();
+}
+function deepCloneArray(arr) {
+    return JSON.parse(JSON.stringify(arr));
+}
+function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":"&#39;"}[c]));
+}
+function formatSize(b){
+    if(b<1024) return b+' B';
+    if(b<1024*1024) return (b/1024).toFixed(1)+' KB';
+    return (b/(1024*1024)).toFixed(1)+' MB';
+}
+function getFileExtension(filename) {
+    return filename.split('.').pop().toLowerCase();
+}
+/**
+ * Baixa um arquivo com suporte opcional a BOM (Byte Order Mark) para UTF-8.
+ */
+function downloadFile(content, filename, mimeType, addBOM = false){
+    let blob;
+    
+    if (addBOM && typeof content === 'string') {
+        const BOM = "\ufeff"; 
+        blob = new Blob([BOM, content], {type: mimeType});
+    } else {
+        blob = new Blob([content], {type: mimeType});
+    }
+    
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    URL.revokeObjectURL(url);
+}
+
+/* --- IndexedDB Functions (Atualizadas para usar filesToDisplay) --- */
+let db = null;
+
+function openDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(DB_NAME, 1);
+
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains(STORE_NAME)) {
+                db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+            }
+        };
+
+        request.onsuccess = (event) => {
+            db = event.target.result;
+            resolve(db);
+        };
+
+        request.onerror = (event) => {
+            console.error("IndexedDB error:", event.target.errorCode);
+            reject(event.target.error);
+        };
+    });
+}
+
+async function saveStateToDB() {
+    if (!db) {
+        try {
+            db = await openDB();
+        } catch (e) {
+            console.error("Não foi possível abrir o IndexedDB para salvar.", e);
+            return;
+        }
+    }
+    
+    // Filtra o buffer dos PDFs antes de salvar (para evitar objetos grandes)
+    const filesMetadata = filesToDisplay.map(file => {
+        const meta = {
+            id: file.id,
+            name: file.name,
+            fileType: file.fileType, // Novo campo
+            size: file.size,
+        };
+        // Adiciona campos específicos do PDF, se for um PDF
+        if (file.fileType === 'pdf') {
+            meta.pageCount = file.pageCount;
+            meta.restricted = file.restricted;
+            meta.pageIndices = file.pageIndices;
+            // buffer é INTENCIONALMENTE OMITIDO
+        }
+        return meta;
+    });
+
+    const state = {
+        id: 1, 
+        filesToDisplay: filesMetadata,
+        extractedTableData: extractedTableData,
+    };
+
+    try {
+        const transaction = db.transaction(STORE_NAME, 'readwrite');
+        const store = transaction.objectStore(STORE_NAME);
+        store.put(state);
+        await new Promise(resolve => transaction.oncomplete = resolve);
+    } catch (e) {
+        console.error("Erro ao salvar estado no IndexedDB:", e);
+    }
+}
+
+async function loadStateFromDB() {
+    try {
+        db = await openDB();
+        const transaction = db.transaction(STORE_NAME, 'readonly');
+        const store = transaction.objectStore(STORE_NAME);
+        const request = store.get(1);
+
+        return new Promise((resolve, reject) => {
+            request.onsuccess = () => {
+                if (request.result) {
+                    const loadedState = request.result;
+                    
+                    filesToDisplay = loadedState.filesToDisplay.map(file => {
+                        if (file.fileType === 'pdf') {
+                            return { ...file, buffer: null }; // PDF sem buffer
+                        }
+                        return file; // Arquivo de dado
+                    });
+
+                    extractedTableData = loadedState.extractedTableData || [];
+                    
+                    if (filesToDisplay.length > 0 || extractedTableData.length > 0) {
+                        renderAll();
+                        updateStats();
+                        const pdfFiles = filesToDisplay.filter(f => f.fileType === 'pdf');
+                        const pdfsWithoutBuffer = pdfFiles.filter(f => f.buffer === null);
+                        
+                        if (pdfsWithoutBuffer.length > 0) {
+                            restoreNotice.style.display = 'flex';
+                        } else if (extractedTableData.length > 0) {
+                            openModal("Dados editados anteriores restaurados com sucesso!", "Estado Restaurado", "✅");
+                        }
+                    }
+                }
+                resolve();
+            };
+            request.onerror = () => reject(request.error);
+        });
+    } catch (e) {
+        console.warn("Nenhum estado anterior encontrado ou erro ao carregar do IndexedDB.");
+    }
+}
+
+/* --- Modal Functions (Mantidas) --- */
+function openModal(msg, title="Aviso", icon="⚠️"){
+    document.getElementById('modalMsg').textContent = msg;
+    document.getElementById('modalTitle').textContent = title;
+    document.getElementById('modalIcon').textContent = icon;
+    document.getElementById('modalBackdrop').style.display='flex';
+}
+function closeModal(){ document.getElementById('modalBackdrop').style.display='none'; }
+function closeRangeModal(){ document.getElementById('rangeModal').style.display='none'; currentEditId=null; }
+function resolveConfirm(result) {
+    document.getElementById('confirmModal').style.display = 'none';
+    if (resolveFileImport) {
+        resolveFileImport(result);
+        resolveFileImport = null;
+    }
+}
+function openConfirmModal(msg, title = "Confirmação") {
+    document.getElementById('confirmModal').style.display = 'flex';
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMsg').textContent = msg;
+    return new Promise(resolve => {
+        resolveFileImport = resolve;
+    });
+}
+function closeEditorModal(){ 
+    editorModal.style.display = 'none'; 
+    saveStateToDB(); 
+}
+function closeExportFormatModal(){
+    exportFormatModal.style.display = 'none';
+}
+exportBtn.onclick = previewData;
+function saveAndExportFromEditor() {
+    saveStateToDB(); 
+    closeEditorModal();
+    exportFormatModal.style.display = 'flex';
+}
+function cancelEditorChanges() {
+    extractedTableData = deepCloneArray(initialEditorState);
+    history = [];
+    historyPointer = -1;
+    initialEditorState = deepCloneArray(extractedTableData);
+    renderEditorTable();
+    updateStats();
+    closeEditorModal();
+    saveStateToDB(); 
+    openModal("Alterações descartadas. O estado inicial foi restaurado.", "Edição Cancelada", "↩️");
+}
+
+
+/* --- File handling (Atualizado para filesToDisplay e correção de duplicata) --- */
+document.getElementById('choosePdfBtn').onclick = ()=> fileInputPdf.click();
+document.getElementById('chooseDataBtn').onclick = ()=> fileInputData.click();
+fileInputPdf.onchange = e => handleFiles(e.target.files, 'pdf');
+fileInputData.onchange = e => handleFiles(e.target.files, 'data');
+
+document.getElementById('uploadZone').ondragover = e=>{ e.preventDefault(); document.getElementById('uploadZone').classList.add('dragover'); };
+document.getElementById('uploadZone').ondragleave = ()=>{ document.getElementById('uploadZone').classList.remove('dragover'); };
+// === CORREÇÃO AQUI: reconhece arquivos mesmo quando file.type está vazio e usa extensão do nome ===
+document.getElementById('uploadZone').ondrop = e=>{ 
+    e.preventDefault(); 
+    document.getElementById('uploadZone').classList.remove('dragover'); 
+    
+    const files = [...e.dataTransfer.files];
+
+    const pdfs = files.filter(f => 
+        f.type === 'application/pdf' ||
+        (f.name && f.name.toLowerCase().endsWith('.pdf'))
+    );
+
+    const dataFiles = files.filter(f => 
+        !(f.type === 'application/pdf' || (f.name && f.name.toLowerCase().endsWith('.pdf')))
+    );
+
+    if (pdfs.length > 0) {
+        handleFiles(pdfs, 'pdf');
+    }
+    if (dataFiles.length > 0) {
+        handleFiles(dataFiles, 'data');
+    }
+};
+
+async function handleFiles(files, type = 'pdf'){
+  let loaded = 0;
+  for(const f of files){
+    
+    const fileExtension = getFileExtension(f.name);
+    
+    // Checa por duplicatas (apenas para abrir o modal de confirmação)
+    const isDuplicate = filesToDisplay.some(p => p.name === f.name && p.size === f.size);
+
+    if (isDuplicate) {
+        const shouldImport = await openConfirmModal(
+            `O arquivo "${f.name}" (Tamanho: ${formatSize(f.size)}) já foi carregado. Deseja importá-lo novamente?`,
+            "Duplicata Detectada"
+        );
+        if (!shouldImport) {
+            continue; 
+        }
+        // Se shouldImport for true, a execução continua e o arquivo será adicionado como uma nova entrada.
+    }
+    
+    try{
+        if (type === 'pdf') {
+            if(!(f.type === 'application/pdf' || (f.name && f.name.toLowerCase().endsWith('.pdf')))) continue;
+            const arrayBuffer = await f.arrayBuffer();
+            const u8 = ensureUint8(arrayBuffer);
+            
+            let pages = 0;
+            let restricted = false;
+
+            try{
+                const doc = await PDFDocument.load(cloneUint8(u8));
+                pages = doc.getPageCount();
+                restricted = false;
+            }catch(e){
+                try{
+                    const pdfjsDoc = await pdfjsLib.getDocument({data: cloneUint8(u8)}).promise;
+                    pages = pdfjsDoc.numPages;
+                    restricted = true;
+                    openModal(`O PDF "${f.name}" é restrito e será processado como imagem (Rasterização) durante a combinação.`, "Aviso de PDF Restrito", "⚠️");
+                }catch(inner){
+                    console.error('Arquivo não processável:', f.name, inner);
+                    openModal(`Erro ao processar: ${f.name}. O arquivo pode estar danificado ou protegido.`, "Erro", "❌");
+                    continue; 
+                }
+            }
+            
+            // Checa se é um recarregamento de um arquivo cujo buffer foi perdido após a restauração do DB
+            const existingFileWithoutBuffer = filesToDisplay.find(p => p.name === f.name && p.buffer === null);
+
+            if (existingFileWithoutBuffer) {
+                // Caso 1: Recarregamento para restaurar o buffer de um arquivo do DB
+                existingFileWithoutBuffer.buffer = cloneUint8(u8);
+                existingFileWithoutBuffer.pageCount = pages; 
+                existingFileWithoutBuffer.size = arrayBuffer.byteLength;
+                existingFileWithoutBuffer.restricted = restricted;
+                restoreNotice.style.display = 'none'; // <-- Esconde o banner de aviso
+            } else {
+                // Caso 2: Arquivo novo ou duplicata confirmada (adiciona uma nova entrada)
+                filesToDisplay.push({
+                    id: String(Date.now()) + '_' + Math.random(),
+                    name: f.name,
+                    fileType: 'pdf',
+                    buffer: cloneUint8(u8),
+                    pageCount: pages,
+                    size: arrayBuffer.byteLength,
+                    restricted: restricted,
+                    pageIndices: null
+                });
+            }
+            
+            loaded++;
+            restoreNotice.style.display = 'none'; 
+        } else { // Tratamento de arquivos de dados (TXT, CSV, JSON)
+            if (!SUPPORTED_DATA_TYPES.includes(`.${fileExtension}`)) continue;
+            
+            const textContent = await f.text();
+            let newExtractedData = [];
+            const fileName = f.name;
+
+            if (fileExtension === 'csv') {
+                newExtractedData = importCsvTsv(textContent, fileName, ',');
+            } else if (fileExtension === 'tsv') {
+                newExtractedData = importCsvTsv(textContent, fileName, '\t');
+            } else if (fileExtension === 'json') {
+                newExtractedData = importJson(textContent, fileName);
+            } else if (fileExtension === 'txt' || f.type.startsWith('text/')) {
+                newExtractedData = importTxt(textContent, fileName);
+            }
+
+            if (newExtractedData.length > 0) {
+                extractedTableData.push(...newExtractedData);
+                
+                // Adiciona o metadado do arquivo de dados para exibição na grade
+                filesToDisplay.push({
+                    id: String(Date.now()) + '_' + Math.random(),
+                    name: f.name,
+                    fileType: fileExtension, // Novo campo com a extensão
+                    size: f.size,
+                    // Sem buffer, pageCount, restricted, etc.
+                });
+                
+                loaded++;
+            }
+        }
+
+    }catch(err){
+      console.error('Erro lendo arquivo:', f.name, err);
+      openModal(`Erro lendo: ${f.name}`, "Erro", "❌");
+    }
+  }
+
+  if(loaded > 0){
+    await renderAll(); 
+    updateStats(); 
+    saveStateToDB(); 
+    openModal(`${loaded} arquivo(s) carregado(s) com sucesso!`, "Sucesso", "✅");
+  }
+  
+  if (type === 'pdf') {
+      fileInputPdf.value = ''; 
+  } else {
+      fileInputData.value = ''; 
+  }
+}
+
+/* --- Importação de Dados Externos (Mantidas) --- */
+function importTxt(content, fileName) {
+    return [{
+        id: String(Date.now()) + '_' + Math.random(),
+        fileName: `[TXT] ${fileName}`,
+        pageNumber: 1,
+        text: content.trim()
+    }];
+}
+function importCsvTsv(content, fileName, separator) {
+    const lines = content.split('\n').filter(line => line.trim() !== '');
+    if (lines.length === 0) return [];
+
+    let data = [];
+    
+    for (let i = 0; i < lines.length; i++) {
+        data.push({
+            id: String(Date.now()) + '_' + Math.random() + '_' + i,
+            fileName: `[CSV/TSV] ${fileName}`,
+            pageNumber: i + 1, 
+            text: lines[i].trim() 
+        });
+    }
+    return data;
+}
+function importJson(content, fileName) {
+    try {
+        const parsed = JSON.parse(content);
+        if (Array.isArray(parsed) && parsed.every(item => typeof item.text === 'string')) {
+            return parsed.map((item, i) => ({
+                id: String(Date.now()) + '_' + Math.random() + '_' + i,
+                fileName: `[JSON] ${fileName}`,
+                pageNumber: item.pageNumber || (i + 1),
+                text: item.text
+            }));
+        } else {
+            return importTxt(JSON.stringify(parsed, null, 2), fileName);
+        }
+    } catch (e) {
+        return importTxt(content, fileName);
+    }
+}
+
+
+/* --- Rendering grid, Drag & Drop, Stats (Atualizadas para filesToDisplay) --- */
+async function renderAll(){
+    const emptyState = pdfGrid.querySelector(".empty-state");
+    if(emptyState) emptyState.remove();
+
+    pdfGrid.innerHTML = "";
+    if(filesToDisplay.length === 0){
+        pdfGrid.innerHTML = '<div class="empty-state"><div class="icon">📂</div><div class="text">Nenhum PDF ou Dado Carregado</div></div>';
+        return;
+    }
+
+    for(const file of filesToDisplay){
+        await renderFileCard(file);
+    }
+    
+    makeCardsDraggable();
+}
+
+async function renderFileCard(file){
+    const card = document.createElement("div");
+    card.className = "pdf-card";
+    card.dataset.id = String(file.id);
+    card.dataset.filetype = file.fileType; // Adiciona o tipo para filtro
+    card.draggable = true;
+
+    // --- Lógica para PDFs ---
+    if (file.fileType === 'pdf') {
+        const restrictedBadge = file.restricted ? '<div class="restricted-badge">RESTRITO</div>' : '';
+        const requiresReload = file.buffer === null; 
+        
+        const preview = document.createElement("div");
+        preview.className = "pdf-preview";
+        preview.innerHTML = restrictedBadge + `<div class="placeholder">${requiresReload ? '⚠️' : '📚'}</div>`;
+
+        const pagesToShow = file.pageIndices ? file.pageIndices.length : file.pageCount;
+        const sizeText = requiresReload ? '?? KB' : formatSize(file.size);
+
+        card.innerHTML = `
+            <div class="pdf-header">
+                <span class="drag-handle">☰</span>
+                <div class="pdf-title">${escapeHtml(file.name)}</div>
+            </div>
+            <div class="pdf-meta">
+                <span>Páginas: ${pagesToShow} de ${file.pageCount}</span>
+                <span>${sizeText}</span>
+            </div>
+            <div class="pdf-actions">
+                <button class="btn secondary" onclick="openRangeModal('${file.id}')" ${requiresReload ? 'disabled' : ''}>Páginas</button>
+                <button class="btn danger" onclick="removeFileById('${file.id}')">Remover</button>
+            </div>
+        `;
+
+        card.insertBefore(preview, card.firstChild);
+        pdfGrid.appendChild(card);
+
+        // Renderiza o preview apenas se o buffer existir
+        if (!requiresReload) {
+            (async()=>{
+                try{
+                    const uint8 = cloneUint8(file.buffer);
+                    const doc = await pdfjsLib.getDocument({data:uint8}).promise;
+                    const page = await doc.getPage(1);
+                    
+                    const viewport = page.getViewport({scale:1});
+                    const scale = 160 / viewport.height;
+                    const scaledViewport = page.getViewport({scale}); 
+
+                    const canvas = document.createElement("canvas");
+                    canvas.width = scaledViewport.width;
+                    canvas.height = scaledViewport.height;
+                    
+                    preview.innerHTML = restrictedBadge;
+                    preview.appendChild(canvas);
+                    
+                    await page.render({canvasContext:canvas.getContext("2d"),viewport: scaledViewport}).promise;
+                }catch(e){
+                    preview.innerHTML = restrictedBadge + '<div class="placeholder">❌</div>';
+                }
+            })();
+        }
+    } else {
+    // --- Lógica para Arquivos de Dados (CSV, JSON, TXT, etc.) ---
+        const iconMap = {
+            'csv': '📊', 'tsv': '📑', 'json': '💾', 'txt': '📄', 'default': '📄'
+        };
+        const icon = iconMap[file.fileType] || iconMap.default;
+        
+        card.innerHTML = `
+            <div class="file-type-badge">.${file.fileType}</div>
+            <div class="pdf-preview" style="height: 80px;">
+                <div class="placeholder" style="font-size: 36px;">${icon}</div>
+            </div>
+            <div class="pdf-header">
+                <span class="drag-handle">☰</span>
+                <div class="pdf-title">${escapeHtml(file.name)}</div>
+            </div>
+            <div class="pdf-meta">
+                <span>Tipo: ${file.fileType.toUpperCase()}</span>
+                <span>${formatSize(file.size)}</span>
+            </div>
+            <div class="pdf-actions">
+                <button class="btn danger" onclick="removeFileById('${file.id}')">Remover</button>
+            </div>
+        `;
+        pdfGrid.appendChild(card);
+    }
+}
+
+// Funções de Drag & Drop (Mantidas, mas operam em filesToDisplay)
+function makeCardsDraggable(){
+    const cards = pdfGrid.querySelectorAll('.pdf-card');
+    cards.forEach(card=>{
+        card.ondragstart = e=>{
+            e.dataTransfer.setData('text/plain', String(card.dataset.id));
+            try{ e.dataTransfer.effectAllowed = 'move'; }catch(e){}
+            card.classList.add('dragging');
+        };
+        card.ondragend = ()=>{
+            card.classList.remove('dragging');
+        };
+    });
+
+    pdfGrid.ondragover = e=>{ e.preventDefault(); };
+    pdfGrid.ondrop = e=>{
+        e.preventDefault();
+        const draggedId = e.dataTransfer.getData('text/plain');
+        const draggedElement = document.querySelector(`.pdf-card[data-id="${draggedId}"]`);
+        if(!draggedElement) return;
+
+        // === CORREÇÃO AQUI: usa elementFromPoint para identificar corretamente o card alvo mesmo se o cursor estiver sobre canvas/textos internos ===
+        let target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.pdf-card');
+
+        // Proteção: se o drop ocorrer sobre os botões de ação, ignorar e manter a ordem atual
+        if (target && target.querySelector('.pdf-actions')?.contains(e.target)) {
+            // apenas re-renderiza a ordem para garantir consistência
+            renderAll();
+            syncOrder();
+            return;
+        }
+
+        if (!target || draggedElement === target) { 
+            // se não houver target (drop em área vazia) ou alvo igual ao arrastado, move para fim
+            if (target && draggedElement === target) return; 
+            pdfGrid.appendChild(draggedElement);
+            syncOrder();
+            return;
+        }
+
+        const allCards = Array.from(pdfGrid.querySelectorAll('.pdf-card'));
+        const draggedIndex = allCards.indexOf(draggedElement);
+        const targetIndex = allCards.indexOf(target);
+
+        if(draggedIndex < targetIndex){
+            pdfGrid.insertBefore(draggedElement, target.nextSibling);
+        }else{
+            pdfGrid.insertBefore(draggedElement, target);
+        }
+        syncOrder();
+    };
+}
+
+function syncOrder(){
+    const ids = [...pdfGrid.querySelectorAll('.pdf-card')].map(n=>n.dataset.id);
+    
+    // Ordena filesToDisplay com base na ordem dos cards no DOM
+    const newFilesToDisplay = [];
+    ids.forEach(id => {
+        const file = filesToDisplay.find(p => String(p.id) === String(id));
+        if (file) {
+            newFilesToDisplay.push(file);
+        }
+    });
+    
+    filesToDisplay = newFilesToDisplay;
+    updateStats();
+    saveStateToDB(); 
+}
+
+function updateStats(){
+    const pdfFiles = filesToDisplay.filter(f => f.fileType === 'pdf');
+    const dataFiles = filesToDisplay.filter(f => SUPPORTED_DATA_TYPES.includes(`.${f.fileType}`));
+
+    const hasPdfs = pdfFiles.length > 0;
+    const hasData = extractedTableData.length > 0;
+    const hasFilesOrData = hasPdfs || dataFiles.length > 0 || hasData;
+
+    // Apenas habilita merge se houver PDFs com buffer (recarregados)
+    const canMerge = pdfFiles.length > 0 && pdfFiles.every(p => p.buffer !== null); 
+    mergeBtn.disabled = !canMerge;
+    
+    clearBtn.disabled = !hasFilesOrData;
+    reverseBtn.disabled = !hasPdfs;
+    
+    // V9 FIX: Habilita o botão de exportação se houver dados OU se houver PDFs para extrair
+    const canExtract = pdfFiles.length > 0 && pdfFiles.every(p => p.buffer !== null);
+    exportBtn.disabled = !(hasData || canExtract); 
+
+    if(hasFilesOrData){
+        document.getElementById('statsBar').style.display = 'flex';
+        
+        // 1. Arquivos Carregados (Total)
+        document.getElementById("statFiles").textContent = filesToDisplay.length;
+
+        // 2. Páginas PDF Total
+        const totalPdfPages = pdfFiles.reduce((sum, p) => sum + (p.pageIndices ? p.pageIndices.length : p.pageCount), 0);
+        document.getElementById("statPages").textContent = totalPdfPages;
+        
+        // 3. Linhas de Dados
+        const dataLinesWrapper = document.getElementById("statDataLinesWrapper");
+        const dataLines = extractedTableData.length;
+        document.getElementById("statDataLines").textContent = dataLines;
+        dataLinesWrapper.style.display = dataLines > 0 ? 'block' : 'none';
+
+        // 4. Tamanho PDF (0 se houver PDFs mas sem buffer)
+        const totalSize = pdfFiles.reduce((sum,p)=>sum+(p.buffer ? p.size : 0),0);
+        document.getElementById("statSize").textContent = formatSize(totalSize);
+    }else{
+        document.getElementById('statsBar').style.display = 'none';
+        if (document.getElementById("statDataLinesWrapper")) {
+            document.getElementById("statDataLinesWrapper").style.display = 'none';
+        }
+    }
+    
+    // Atualização dos botões Undo/Redo (mantida)
+    if (undoBtn && redoBtn) {
+        if (history.length > 0) {
+            undoBtn.disabled = historyPointer <= 0;
+            redoBtn.disabled = historyPointer >= history.length - 1;
+        } else {
+            undoBtn.disabled = true;
+            redoBtn.disabled = true;
+        }
+    }
+}
+
+// *** Funções de Ações (Atualizadas) ***
+
+clearBtn.onclick = ()=>{ 
+    filesToDisplay=[]; 
+    extractedTableData = []; 
+    history = [];
+    historyPointer = -1;
+    initialEditorState = [];
+    renderAll(); 
+    updateStats(); 
+    saveStateToDB(); 
+    restoreNotice.style.display = 'none'; 
+    openModal('Lista de arquivos e dados limpa', "Sucesso", "✅"); 
+};
+
+reverseBtn.onclick = ()=>{ 
+    filesToDisplay.reverse(); 
+    renderAll(); 
+    updateStats(); 
+    saveStateToDB(); 
+    openModal('Ordem dos arquivos invertida', "Sucesso", "🔄"); 
+};
+
+function removeFileById(id){ 
+    const file = filesToDisplay.find(f => String(f.id) === String(id));
+    if (!file) return;
+
+    filesToDisplay = filesToDisplay.filter(f=>String(f.id)!==String(id)); 
+    
+    // Se for um arquivo de dados, remove as entradas correspondentes do extractedTableData
+    if (file.fileType !== 'pdf') {
+        const fileTag = `[${file.fileType.toUpperCase()}] ${file.name}`;
+        extractedTableData = extractedTableData.filter(d => d.fileName !== fileTag);
+    }
+    
+    renderAll(); 
+    updateStats(); 
+    saveStateToDB(); 
+    openModal(`Arquivo ${file.name} removido`, "Sucesso", "🗑️");
+}
+
+// --- Funções de Seleção de Páginas (Apenas para PDFs, usando filesToDisplay) ---
+let currentEditId = null; 
+
+function openRangeModal(id){
+    currentEditId = String(id);
+    const file = filesToDisplay.find(f=>String(f.id)===String(id) && f.fileType === 'pdf');
+    if(!file) return;
+
+    document.getElementById('rangeFileName').textContent = file.name;
+    
+    let rangeString = "";
+    if (file.pageIndices) {
+        const indices = file.pageIndices.map(i => i + 1).sort((a, b) => a - b);
+        if (indices.length > 0) {
+            let start = indices[0];
+            let end = indices[0];
+            for (let i = 1; i < indices.length; i++) {
+                if (indices[i] === end + 1) {
+                    end = indices[i];
+                } else {
+                    rangeString += (start === end ? start : `${start}-${end}`) + ", ";
+                    start = indices[i];
+                    end = indices[i];
+                }
+            }
+            rangeString += (start === end ? start : `${start}-${end}`);
+        }
+    } else {
+        rangeString = `1-${file.pageCount}`;
+    }
+    
+    rangeInput.value = rangeString;
+    document.getElementById('rangeModal').style.display='flex';
+}
+
+function parsePageRange(range, maxPages){
+    const indices = new Set(); 
+    const parts = range.split(',').map(p => p.trim()).filter(p => p); 
+
+    for(const part of parts){
+        if(part.includes('-')){
+            const [startStr, endStr] = part.split('-').map(s => s.trim());
+            const start = parseInt(startStr);
+            const end = parseInt(endStr);
+            
+            if(isNaN(start) || isNaN(end) || start < 1 || end > maxPages || start > end){
+                return null; 
+            }
+
+            for(let i=start; i<=end; i++){
+                indices.add(i - 1); 
+            }
+
+        } else {
+            const page = parseInt(part);
+            if(isNaN(page) || page < 1 || page > maxPages){
+                return null; 
+            }
+            indices.add(page - 1); 
+        }
+    }
+    return Array.from(indices).sort((a, b) => a - b);
+}
+
+async function applyPageRange(){
+    const file = filesToDisplay.find(f=>String(f.id)===String(currentEditId));
+    if(!file || file.fileType !== 'pdf') return;
+    
+    const range = rangeInput.value.trim();
+    if(!range) {
+        file.pageIndices = null; 
+        closeRangeModal();
+        renderAll();
+        updateStats();
+        saveStateToDB(); 
+        return;
+    }
+
+    const newIndices = parsePageRange(range, file.pageCount);
+
+    if(newIndices === null || newIndices.length === 0){
+        openModal(`O formato de páginas é inválido ou está fora do limite (1-${file.pageCount}). Ex: 1-3, 5`, "Erro de Páginas", "❌");
+        return;
+    }
+
+    file.pageIndices = newIndices;
+
+    closeRangeModal();
+    renderAll();
+    updateStats();
+    saveStateToDB(); 
+    openModal(`Páginas de "${file.name}" atualizadas. ${newIndices.length} página(s) selecionada(s).`, "Sucesso", "✅");
+}
+
+// --- Funções de Combinação (Merge) (Atualizadas para filesToDisplay) ---
+
+mergeBtn.onclick = mergePDFs;
+
+async function mergePDFs(){
+    const pdfFiles = filesToDisplay.filter(f => f.fileType === 'pdf');
+
+    if(pdfFiles.length === 0 || pdfFiles.some(p => p.buffer === null)) {
+        openModal("Por favor, recarregue os PDFs (buffer perdido) para combinar. O aviso amarelo na tela indica quais arquivos precisam ser recarregados.", "Arquivos Ausentes", "❌");
+        return;
+    }
+    
+    mergeBtn.innerHTML = '<span>⏳</span> Combinando...';
+    mergeBtn.disabled = true;
+
+    try{
+        const merged = await PDFDocument.create();
+
+        for(const file of pdfFiles){
+            const fresh = cloneUint8(file.buffer); 
+            let indices = file.pageIndices || [...Array(file.pageCount).keys()];
+
+            if (file.restricted) {
+                const pdfjsDoc = await pdfjsLib.getDocument({data: fresh}).promise;
+                
+                for (const pageIndex of indices) {
+                    const page = await pdfjsDoc.getPage(pageIndex + 1); 
+
+                    const viewport = page.getViewport({ scale: 1.5 });
+                    const canvas = document.createElement("canvas");
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    const canvasContext = canvas.getContext("2d");
+                    await page.render({ canvasContext, viewport }).promise;
+
+                    const [pageWidth, pageHeight] = A4_DIMENSIONS; 
+                    const mergedPage = merged.addPage([pageWidth, pageHeight]);
+
+                    const imagePng = await merged.embedPng(canvas.toDataURL('image/png'));
+                    const { width: imgWidth, height: imgHeight } = imagePng;
+
+                    const scaleFactor = Math.min(pageWidth / imgWidth, pageHeight / imgHeight);
+                    const finalWidth = imgWidth * scaleFactor;
+                    const finalHeight = imgHeight * scaleFactor;
+
+                    const x = (pageWidth - finalWidth) / 2;
+                    const y = (pageHeight - finalHeight) / 2;
+                    
+                    mergedPage.drawImage(imagePng, {
+                        x: x,
+                        y: y,
+                        width: finalWidth,
+                        height: finalHeight
+                    });
+                }
+            } else { 
+                const pdf = await PDFDocument.load(fresh);
+                const pdfIndices = indices.filter(i => i < pdf.getPageCount()); 
+                const pages = await merged.copyPages(pdf, pdfIndices);
+                pages.forEach(p => merged.addPage(p));
+            }
+        }
+        
+        if (merged.getPageCount() === 0) {
+            throw new Error("Nenhuma página válida para combinar.");
+        }
+
+        const bytes = await merged.save();
+        const blob = new Blob([bytes],{type:"application/pdf"});
+        const url = URL.createObjectURL(blob);
+
+        const timestamp = new Date().toISOString().slice(0,10);
+        const filename = `PDF_Combinado_${timestamp}.pdf`;
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+
+        URL.revokeObjectURL(url);
+        
+        openModal(`PDF combinado com sucesso!\n${pdfFiles.length} arquivos • ${merged.getPageCount()} páginas`,"Sucesso","✅");
+
+    }catch(e){
+        console.error('Erro ao combinar:', e);
+        openModal(`Erro ao combinar PDFs: ${e.message || 'Verifique o console para detalhes.'}`,"Erro","❌");
+    }finally{
+        mergeBtn.innerHTML = '<span>✨</span> Combinar PDFs';
+        mergeBtn.disabled = false;
+    }
+}
+
+
+// --- Prévia e Edição (Editor Modal) (Atualizado para filesToDisplay) ---
+
+/**
+ * Funções de Extração de Texto para o Editor 
+ */
+async function extractTextFromPage(pdfjsDoc, pageIndex, fileName){
+    try {
+        const page = await pdfjsDoc.getPage(pageIndex + 1);
+        const textContent = await page.getTextContent();
+        let lastY = Infinity;
+        const text = textContent.items.map(item => {
+            const str = item.str;
+            let result = str;
+            if (lastY !== Infinity && (lastY - item.transform[5]) > (item.height * 2)) {
+                result = '\n' + result;
+            }
+            lastY = item.transform[5]; 
+            return result;
+        }).join(' ').replace(/\s{2,}/g, ' ').trim();
+
+        if (!text) return null;
+
+        return {
+            id: String(Date.now()) + '_' + Math.random(),
+            fileName: fileName,
+            pageNumber: pageIndex + 1,
+            text: text
+        };
+    } catch (e) {
+        console.warn(`Erro ao extrair texto da página ${pageIndex + 1} de ${fileName}:`, e);
+        return null;
+    }
+}
+
+async function extractAllText() {
+    let extracted = [];
+    const pdfFiles = filesToDisplay.filter(f => f.fileType === 'pdf');
+
+    for (const file of pdfFiles) {
+        if (file.buffer === null) {
+            console.warn(`Pulando PDF ${file.name} por não ter buffer carregado.`);
+            continue;
+        }
+
+        try {
+            const pdfjsDoc = await pdfjsLib.getDocument({ data: cloneUint8(file.buffer) }).promise;
+            
+            const pagesToProcess = file.pageIndices || Array.from({ length: file.pageCount }, (_, i) => i);
+
+            for (const pageIndex of pagesToProcess) {
+                const item = await extractTextFromPage(pdfjsDoc, pageIndex, file.name);
+                if (item) {
+                    extracted.push(item);
+                }
+            }
+        } catch (e) {
+            console.error(`Erro ao carregar PDF para extração de texto: ${file.name}`, e);
+        }
+    }
+    return extracted;
+}
+
+/**
+ * 1. Abre o modal de edição (Preview) e renderiza a tabela.
+ */
+async function previewData(){
+    const pdfFilesWithBuffer = filesToDisplay.filter(f => f.fileType === 'pdf' && f.buffer !== null);
+    const dataFilesExist = filesToDisplay.filter(f => f.fileType !== 'pdf').length > 0;
+
+    if (pdfFilesWithBuffer.length === 0 && extractedTableData.length === 0 && !dataFilesExist) {
+        openModal("Nenhum arquivo carregado para prévia/edição.", "Aviso", "⚠️");
+        return;
+    }
+    
+    // Extrai o texto dos PDFs que estão carregados (têm buffer)
+    let extractedFromPdfs = [];
+    if (pdfFilesWithBuffer.length > 0) {
+        extractedFromPdfs = await extractAllText();
+    }
+    
+    const currentPdfData = extractedTableData.filter(d => !SUPPORTED_DATA_TYPES.some(ext => d.fileName.includes(`[${ext.toUpperCase().substring(1)}]`)));
+    const externalData = extractedTableData.filter(d => SUPPORTED_DATA_TYPES.some(ext => d.fileName.includes(`[${ext.toUpperCase().substring(1)}]`)));
+
+    const newExtractedMap = new Map();
+    extractedFromPdfs.forEach(d => {
+        const originalFileName = d.fileName.replace(/ \(\d+\)$/, '');
+        newExtractedMap.set(originalFileName + d.pageNumber, d);
+    });
+
+    const persistentPdfData = currentPdfData.filter(d => {
+        const originalFileName = d.fileName.replace(/ \(\d+\)$/, '');
+        const key = originalFileName + d.pageNumber;
+        return newExtractedMap.has(key);
+    });
+
+    const combinedData = Array.from(newExtractedMap.values()).concat(externalData);
+
+    extractedTableData = combinedData.sort((a, b) => {
+        const aIsPdf = !SUPPORTED_DATA_TYPES.some(ext => a.fileName.includes(`[${ext.toUpperCase().substring(1)}]`));
+        const bIsPdf = !aIsPdf;
+        
+        if (aIsPdf && !bIsPdf) return -1;
+        if (!aIsPdf && bIsPdf) return 1;
+        return a.fileName.localeCompare(b.fileName) || a.pageNumber - b.pageNumber;
+    });
+
+    
+    if (extractedTableData.length === 0) {
+        openModal("Nenhuma página com texto foi extraída e nenhum dado externo foi importado.", "Erro na Extração", "❌");
+        return;
+    }
+    
+    initialEditorState = deepCloneArray(extractedTableData);
+    
+    if (history.length === 0) {
+        saveHistory(true); 
+    }
+    
+    renderEditorTable();
+    editorModal.style.display = 'flex';
+}
+
+// Funções do Editor Modal (Mantidas)
+function renderEditorTable(){
+    editorTableBody.innerHTML = '';
+    
+    if (extractedTableData.length === 0) {
+        editorTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px;">Nenhum dado para edição.</td></tr>';
+        deleteRowsBtn.disabled = true; 
+        selectAllRows.checked = false;
+        return;
+    }
+
+    extractedTableData.forEach((item) => {
+        const row = editorTableBody.insertRow();
+        row.dataset.id = String(item.id);
+        row.id = `row-${item.id}`;
+
+        const cellCheck = row.insertCell();
+        cellCheck.style.textAlign = 'center';
+        cellCheck.innerHTML = `<input type="checkbox" class="row-checkbox" data-id="${item.id}" onchange="updateDeleteButtonState()">`;
+        
+        row.insertCell().textContent = item.fileName;
+        row.insertCell().textContent = item.pageNumber;
+
+        const cellText = row.insertCell();
+        cellText.setAttribute('contenteditable', 'true');
+        cellText.innerHTML = escapeHtml(item.text); 
+        cellText.onblur = handleInlineEdit;
+        cellText.oninput = handleInlineInput;
+    });
+
+    updateDeleteButtonState();
+    updateStats(); 
+}
+function handleInlineEdit(e){
+    const newText = e.target.textContent;
+    const itemId = e.target.parentNode.dataset.id;
+    const item = extractedTableData.find(d => String(d.id) === String(itemId));
+
+    if (item && item.text !== newText) {
+        item.text = newText;
+        saveHistory(); 
+        saveStateToDB(); 
+        e.target.innerHTML = escapeHtml(newText);
+    }
+}
+function handleInlineInput(e) { /* onblur funciona */ }
+function saveHistory(isInitial = false) {
+    if (!isInitial && historyPointer < history.length - 1) {
+        history = history.slice(0, historyPointer + 1);
+    }
+    const stateCopy = deepCloneArray(extractedTableData);
+    history.push(stateCopy);
+    if (history.length > MAX_HISTORY) {
+        history.shift();
+    }
+    historyPointer = history.length - 1; 
+    updateStats(); 
+}
+undoBtn.onclick = function() {
+    if (historyPointer > 0) {
+        historyPointer--;
+        extractedTableData = deepCloneArray(history[historyPointer]);
+        renderEditorTable();
+        saveStateToDB(); 
+    }
+    updateStats();
+};
+redoBtn.onclick = function() {
+    if (historyPointer < history.length - 1) {
+        historyPointer++;
+        extractedTableData = deepCloneArray(history[historyPointer]);
+        renderEditorTable();
+        saveStateToDB(); 
+    }
+    updateStats();
+};
+deleteRowsBtn.onclick = function() { 
+    const selectedIds = [];
+    editorTableBody.querySelectorAll('.row-checkbox:checked').forEach(cb => {
+        selectedIds.push(String(cb.dataset.id));
+    });
+
+    if (selectedIds.length > 0) {
+        extractedTableData = extractedTableData.filter(item => !selectedIds.includes(String(item.id)));
+        saveHistory(); 
+        saveStateToDB(); 
+        renderEditorTable(); 
+        openModal(`${selectedIds.length} linha(s) excluída(s).`, "Sucesso", "✅");
+    }
+};
+function updateDeleteButtonState() {
+    if (!editorTableBody || !deleteRowsBtn || !selectAllRows) {
+        return;
+    }
+    
+    const checkboxes = editorTableBody.querySelectorAll('.row-checkbox');
+    let selectedCount = 0;
+    checkboxes.forEach(cb => {
+        const row = document.getElementById(`row-${cb.dataset.id}`);
+        if (row) { 
+            if (cb.checked) {
+                selectedCount++;
+                row.classList.add('row-selected');
+            } else {
+                row.classList.remove('row-selected');
+            }
+        }
+    });
+
+    deleteRowsBtn.disabled = selectedCount === 0;
+    selectAllRows.checked = checkboxes.length > 0 && selectedCount === checkboxes.length;
+}
+selectAllRows.onclick = function() {
+    const isChecked = this.checked;
+    editorTableBody.querySelectorAll('.row-checkbox').forEach(cb => {
+        cb.checked = isChecked;
+    });
+    updateDeleteButtonState();
+};
+
+// --- Funções de Exportação (Adicionado PDF) ---
+
+function startExport(format) {
+    closeExportFormatModal();
+
+    if (extractedTableData.length === 0) {
+        openModal("Nenhum dado extraído/importado para exportar.", "Erro", "❌");
+        return;
+    }
+
+    const data = extractedTableData.map(item => ({
+        Arquivo: item.fileName,
+        Pagina: item.pageNumber,
+        Conteudo: item.text
+    }));
+
+    let content, mimeType, filename;
+    const baseName = "Dados_Editados_" + new Date().toISOString().slice(0, 10);
+
+    switch (format) {
+        
+        // V10: Novo caso para exportação em PDF
+        case 'pdf': {
+            openModal("Gerando PDF... Esta operação pode levar alguns segundos.", "Aguarde", "⏳");
+            setTimeout(async () => {
+                try {
+                    const pdfDoc = await PDFDocument.create();
+                    const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
+                    
+                    const pageSize = PageSizes.A4;
+                    const [pageWidth, pageHeight] = pageSize;
+                    const margin = 50;
+                    const maxContentWidth = pageWidth - 2 * margin;
+                    const fontSize = 10;
+                    const lineHeight = fontSize * 1.5;
+                    const startY = pageHeight - margin;
+
+                    let currentPage = pdfDoc.addPage(pageSize);
+                    let y = startY;
+
+                    for (const item of data) {
+                        const header = `--- Arquivo: ${item.Arquivo} | Pág: ${item.Pagina} ---`;
+                        
+                        if (y < margin + lineHeight * 3) {
+                            currentPage = pdfDoc.addPage(pageSize);
+                            y = startY;
+                        }
+                        
+                        currentPage.drawText(header, {
+                            x: margin,
+                            y: y,
+                            size: fontSize + 2,
+                            font: font,
+                            color: PDFLib.rgb(0.1, 0.1, 0.5),
+                        });
+                        y -= lineHeight * 1.5;
+
+                        const textLines = item.Conteudo.split('\n');
+                        for (const line of textLines) {
+                            const wrappedText = font.splitTextIntoLines(line, {
+                                fontSize: fontSize,
+                                maxWidth: maxContentWidth,
+                            });
+                            
+                            for (const wrappedLine of wrappedText) {
+                                if (y < margin + lineHeight) {
+                                    currentPage = pdfDoc.addPage(pageSize);
+                                    y = startY;
+                                }
+                                currentPage.drawText(wrappedLine, {
+                                    x: margin,
+                                    y: y,
+                                    size: fontSize,
+                                    font: font,
+                                    color: PDFLib.rgb(0, 0, 0),
+                                });
+                                y -= lineHeight;
+                            }
+                        }
+
+                        y -= lineHeight * 2;
+                    }
+
+                    const pdfBytes = await pdfDoc.save();
+                    downloadFile(pdfBytes, baseName + ".pdf", "application/pdf");
+                    openModal(`Exportação para PDF concluída!`, "Sucesso", "✅");
+
+                } catch (e) {
+                    console.error('Erro ao exportar PDF:', e);
+                    openModal(`Erro ao gerar PDF: ${e.message}`, "Erro", "❌");
+                }
+            }, 10);
+            break;
+        }
+
+        case 'txt':
+            content = data.map(d => `--- ${d.Arquivo} - Pág ${d.Pagina} ---\n${d.Conteudo}`).join('\n\n');
+            mimeType = 'text/plain;charset=utf-8';
+            filename = baseName + ".txt";
+            downloadFile(content, filename, mimeType);
+            break;
+        case 'json':
+            content = JSON.stringify(data, null, 2);
+            mimeType = 'application/json;charset=utf-8';
+            filename = baseName + ".json";
+            downloadFile(content, filename, mimeType);
+            break;
+        case 'csv':
+        case 'tsv': {
+            const separator = format === 'csv' ? ',' : '\t';
+            const headers = ['Arquivo', 'Pagina', 'Conteudo'];
+            
+            content = headers.join(separator) + '\n' + 
+                      data.map(row => 
+                          headers.map(header => {
+                              let value = String(row[header]).replace(/"/g, '""');
+                              if (value.includes(separator) || value.includes('\n') || value.includes('"')) {
+                                  value = `"${value}"`;
+                              }
+                              return value;
+                          }).join(separator)
+                      ).join('\n');
+            
+            mimeType = `text/${format === 'csv' ? 'csv' : 'tab-separated-values'};charset=utf-8`;
+            filename = baseName + "." + format;
+            downloadFile(content, filename, mimeType, true); 
+            break;
+        }
+        case 'html':
+            content = `
+                <!DOCTYPE html>
+                <html>
+                <head><title>Dados Exportados</title>
+                <style>table{border-collapse:collapse;width:100%;}th,td{border:1px solid #ddd;padding:8px;text-align:left;}th{background-color:#f2f2f2;}</style>
+                </head>
+                <body>
+                    <h2>Dados Extraídos e Editados</h2>
+                    <table>
+                        <thead>
+                            <tr><th>Arquivo</th><th>Página</th><th>Conteúdo</th></tr>
+                        </thead>
+                        <tbody>
+                            ${data.map(d => `<tr><td>${escapeHtml(d.Arquivo)}</td><td>${d.Pagina}</td><td>${escapeHtml(d.Conteudo).replace(/\n/g, '<br>')}</td></tr>`).join('')}
+                        </tbody>
+                    </table>
+                </body>
+                </html>
+            `;
+            mimeType = 'text/html;charset=utf-8';
+            filename = baseName + ".html";
+            downloadFile(content, filename, mimeType);
+            break;
+        case 'doc':
+            content = `
+                <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+                <head><meta charset='utf-8'><title>Documento</title>
+                <style>body{font-family: Arial, sans-serif;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #000;padding:8px;text-align:left;}th{background-color:#ccc;}</style>
+                </head>
+                <body>
+                    <h2>Dados Extraídos e Editados</h2>
+                    <table>
+                        <thead>
+                            <tr><th>Arquivo</th><th>Página</th><th>Conteúdo</th></tr>
+                        </thead>
+                        <tbody>
+                            ${data.map(d => `<tr><td>${escapeHtml(d.Arquivo)}</td><td>${d.Pagina}</td><td>${escapeHtml(d.Conteudo).replace(/\n/g, '<br>')}</td></tr>`).join('')}
+                        </tbody>
+                    </table>
+                </body>
+                </html>
+            `;
+            mimeType = 'application/msword';
+            filename = baseName + ".doc";
+            downloadFile(content, filename, mimeType);
+            break;
+        case 'xlsx':
+            openModal("Exportação para XLSX requer uma biblioteca externa mais leve no navegador. Use CSV/TSV para compatibilidade.", "Aviso", "⚠️");
+            break;
+        default:
+            openModal("Formato desconhecido.", "Erro", "❌");
+    }
+}
+
+loadStateFromDB(); // tenta restaurar estado ao carregar a página
+
+</script>
+</body>
+</html>
