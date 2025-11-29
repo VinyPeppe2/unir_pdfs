@@ -267,7 +267,7 @@ body{
         </div>
     </div>
     <footer style="text-align:center;padding:20px;color:rgba(255,255,255,.8);font-size:14px">
-        &copy Peppe 2025
+        &copy; Peppe 2025
     </footer>
 </div>
 
@@ -311,6 +311,7 @@ body{
 
 <div id="exportFormatModal" class="modal-backdrop">
     <div class="modal">
+        <button style="position:absolute; top: 15px; right: 15px; background:none; border:none; font-size: 20px; cursor:pointer; color:#6c757d;" onclick="closeExportFormatModal()">❌</button>
         <div class="modal-icon">⬇️</div>
         <div class="modal-title">Selecione o Formato de Exportação</div>
         <div class="modal-msg">Os dados exportados serão a versão mais recente **editada** por você.</div>
@@ -324,8 +325,7 @@ body{
             <button class="format-btn" onclick="startExport('csv')"><span>📊</span> CSV para Excel (.csv)</button>
             <button class="format-btn" onclick="startExport('tsv')"><span>📑</span> TSV (Tabular) (.tsv)</button>
             <button class="format-btn" onclick="startExport('xlsx')"><span>📈</span> Planilha Excel (.xlsx)</button>
-            <button class="format-btn secondary" style="background:#dc3545; color: white; grid-column: 1 / 4;" onclick="closeExportFormatModal()">Cancelar</button>
-        </div>
+            </div>
     </div>
 </div>
 
@@ -424,6 +424,7 @@ function formatSize(b){
     if(b<1024*1024) return (b/1024).toFixed(1)+' KB';
     return (b/(1024*1024)).toFixed(1)+' MB';
 }
+// CORREÇÃO DO ERRO DE SINTAXE APLICADA AQUI
 function getFileExtension(filename) {
     return filename.split('.').pop().toLowerCase();
 }
@@ -738,37 +739,33 @@ async function handleFiles(files, type = 'pdf'){
 
             if (newExtractedData.length > 0) {
                 extractedTableData.push(...newExtractedData);
-                
                 // Adiciona o metadado do arquivo de dados para exibição na grade
                 filesToDisplay.push({
                     id: String(Date.now()) + '_' + Math.random(),
                     name: f.name,
                     fileType: fileExtension, // Novo campo com a extensão
-                    size: f.size,
-                    // Sem buffer, pageCount, restricted, etc.
+                    size: f.size, // Sem buffer, pageCount, restricted, etc.
                 });
-                
                 loaded++;
             }
         }
-
     }catch(err){
-      console.error('Erro lendo arquivo:', f.name, err);
-      openModal(`Erro lendo: ${f.name}`, "Erro", "❌");
+        console.error('Erro lendo arquivo:', f.name, err);
+        openModal(`Erro lendo: ${f.name}`, "Erro", "❌");
     }
   }
 
   if(loaded > 0){
-    await renderAll(); 
-    updateStats(); 
-    saveStateToDB(); 
+    await renderAll();
+    updateStats();
+    saveStateToDB();
     openModal(`${loaded} arquivo(s) carregado(s) com sucesso!`, "Sucesso", "✅");
   }
-  
+
   if (type === 'pdf') {
-      fileInputPdf.value = ''; 
+    fileInputPdf.value = '';
   } else {
-      fileInputData.value = ''; 
+    fileInputData.value = '';
   }
 }
 
@@ -781,47 +778,128 @@ function importTxt(content, fileName) {
         text: content.trim()
     }];
 }
+
 function importCsvTsv(content, fileName, separator) {
     const lines = content.split('\n').filter(line => line.trim() !== '');
     if (lines.length === 0) return [];
-
-    let data = [];
     
+    let data = [];
     for (let i = 0; i < lines.length; i++) {
         data.push({
             id: String(Date.now()) + '_' + Math.random() + '_' + i,
             fileName: `[CSV/TSV] ${fileName}`,
-            pageNumber: i + 1, 
-            text: lines[i].trim() 
+            pageNumber: i + 1,
+            text: lines[i].trim()
         });
     }
     return data;
 }
+
 function importJson(content, fileName) {
     try {
-        const parsed = JSON.parse(content);
-        if (Array.isArray(parsed) && parsed.every(item => typeof item.text === 'string')) {
-            return parsed.map((item, i) => ({
-                id: String(Date.now()) + '_' + Math.random() + '_' + i,
+        const json = JSON.parse(content);
+        if (Array.isArray(json)) {
+            return json.map((item, index) => ({
+                id: String(Date.now()) + '_' + Math.random() + '_' + index,
                 fileName: `[JSON] ${fileName}`,
-                pageNumber: item.pageNumber || (i + 1),
-                text: item.text
+                pageNumber: index + 1,
+                text: JSON.stringify(item)
             }));
-        } else {
-            return importTxt(JSON.stringify(parsed, null, 2), fileName);
+        } else if (typeof json === 'object' && json !== null) {
+            return [{
+                id: String(Date.now()) + '_' + Math.random(),
+                fileName: `[JSON] ${fileName}`,
+                pageNumber: 1,
+                text: JSON.stringify(json, null, 2)
+            }];
         }
+        openModal(`O arquivo JSON "${fileName}" está vazio ou em formato inesperado.`, "Aviso de JSON", "⚠️");
+        return [];
     } catch (e) {
-        return importTxt(content, fileName);
+        console.error("Erro ao analisar JSON:", e);
+        openModal(`Erro ao analisar o arquivo JSON: ${fileName}. Verifique a sintaxe.`, "Erro de JSON", "❌");
+        return [];
     }
 }
 
 
-/* --- Rendering grid, Drag & Drop, Stats (Atualizadas para filesToDisplay) --- */
+/* --- Drag and Drop / Renderização (Atualizadas para filesToDisplay) --- */
+function makeCardsDraggable(){
+    const cards = pdfGrid.querySelectorAll('.pdf-card');
+    let draggedElement = null;
+
+    cards.forEach(card=>{
+        card.addEventListener('dragstart', function(){
+            draggedElement = this;
+            setTimeout(()=>this.classList.add('dragging'), 0);
+        });
+
+        card.addEventListener('dragend', function(){
+            this.classList.remove('dragging');
+            draggedElement = null;
+        });
+    });
+
+    pdfGrid.ondragover = e => e.preventDefault();
+    pdfGrid.ondrop = e => {
+        e.preventDefault();
+        if (!draggedElement) return;
+
+        // Procura o elemento alvo mesmo se o cursor estiver sobre canvas/textos internos
+        let target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.pdf-card');
+
+        // Proteção: se o drop ocorrer sobre os botões de ação, ignorar e manter a ordem atual
+        if (target && target.querySelector('.pdf-actions')?.contains(e.target)) {
+            // apenas re-renderiza a ordem para garantir consistência
+            renderAll();
+            syncOrder();
+            return;
+        }
+
+        if (!target || draggedElement === target) {
+            // se não houver target (drop em área vazia) ou alvo igual ao arrastado, move para fim
+            if (target && draggedElement === target) return;
+            pdfGrid.appendChild(draggedElement);
+            syncOrder();
+            return;
+        }
+
+        const allCards = Array.from(pdfGrid.querySelectorAll('.pdf-card'));
+        const draggedIndex = allCards.indexOf(draggedElement);
+        const targetIndex = allCards.indexOf(target);
+        
+        if(draggedIndex < targetIndex){
+            pdfGrid.insertBefore(draggedElement, target.nextSibling);
+        }else{
+            pdfGrid.insertBefore(draggedElement, target);
+        }
+        syncOrder();
+    };
+}
+
+function syncOrder(){
+    const ids = [...pdfGrid.querySelectorAll('.pdf-card')].map(n=>n.dataset.id);
+
+    // Ordena filesToDisplay com base na ordem dos cards no DOM
+    const newFilesToDisplay = [];
+    ids.forEach(id => {
+        const file = filesToDisplay.find(p => String(p.id) === String(id));
+        if (file) {
+            newFilesToDisplay.push(file);
+        }
+    });
+
+    filesToDisplay = newFilesToDisplay;
+    updateStats();
+    saveStateToDB();
+}
+
 async function renderAll(){
-    const emptyState = pdfGrid.querySelector(".empty-state");
+    const emptyState = pdfGrid.querySelector('.empty-state');
     if(emptyState) emptyState.remove();
 
     pdfGrid.innerHTML = "";
+
     if(filesToDisplay.length === 0){
         pdfGrid.innerHTML = '<div class="empty-state"><div class="icon">📂</div><div class="text">Nenhum PDF ou Dado Carregado</div></div>';
         return;
@@ -830,7 +908,7 @@ async function renderAll(){
     for(const file of filesToDisplay){
         await renderFileCard(file);
     }
-    
+
     makeCardsDraggable();
 }
 
@@ -844,8 +922,8 @@ async function renderFileCard(file){
     // --- Lógica para PDFs ---
     if (file.fileType === 'pdf') {
         const restrictedBadge = file.restricted ? '<div class="restricted-badge">RESTRITO</div>' : '';
-        const requiresReload = file.buffer === null; 
-        
+        const requiresReload = file.buffer === null;
+
         const preview = document.createElement("div");
         preview.className = "pdf-preview";
         preview.innerHTML = restrictedBadge + `<div class="placeholder">${requiresReload ? '⚠️' : '📚'}</div>`;
@@ -878,11 +956,11 @@ async function renderFileCard(file){
                     const uint8 = cloneUint8(file.buffer);
                     const doc = await pdfjsLib.getDocument({data:uint8}).promise;
                     const page = await doc.getPage(1);
-                    
                     const viewport = page.getViewport({scale:1});
+                    
                     const scale = 160 / viewport.height;
-                    const scaledViewport = page.getViewport({scale}); 
-
+                    const scaledViewport = page.getViewport({scale});
+                    
                     const canvas = document.createElement("canvas");
                     canvas.width = scaledViewport.width;
                     canvas.height = scaledViewport.height;
@@ -897,26 +975,32 @@ async function renderFileCard(file){
             })();
         }
     } else {
-    // --- Lógica para Arquivos de Dados (CSV, JSON, TXT, etc.) ---
+        // --- Lógica para Arquivos de Dados (CSV, JSON, TXT, etc.) ---
         const iconMap = {
-            'csv': '📊', 'tsv': '📑', 'json': '💾', 'txt': '📄', 'default': '📄'
+            'csv': '📊',
+            'tsv': '📑',
+            'json': '💾',
+            'txt': '📄'
         };
-        const icon = iconMap[file.fileType] || iconMap.default;
-        
+        const icon = iconMap[file.fileType] || '🗂️';
+        const fileTag = `[${file.fileType.toUpperCase()}] ${file.name}`;
+        const dataLines = extractedTableData.filter(d => d.fileName === fileTag).length;
+
         card.innerHTML = `
-            <div class="file-type-badge">.${file.fileType}</div>
-            <div class="pdf-preview" style="height: 80px;">
-                <div class="placeholder" style="font-size: 36px;">${icon}</div>
+            <div class="file-type-badge">${file.fileType.toUpperCase()}</div>
+            <div class="pdf-preview">
+                <div class="placeholder" style="font-size: 80px;">${icon}</div>
             </div>
             <div class="pdf-header">
                 <span class="drag-handle">☰</span>
-                <div class="pdf-title">${escapeHtml(file.name)}</div>
+                <div class="pdf-title" style="font-size: 16px;">${escapeHtml(file.name)}</div>
             </div>
             <div class="pdf-meta">
-                <span>Tipo: ${file.fileType.toUpperCase()}</span>
+                <span>Linhas de Dados: ${dataLines}</span>
                 <span>${formatSize(file.size)}</span>
             </div>
             <div class="pdf-actions">
+                <button class="btn secondary" onclick="previewData()">Prévia Dados</button>
                 <button class="btn danger" onclick="removeFileById('${file.id}')">Remover</button>
             </div>
         `;
@@ -924,176 +1008,124 @@ async function renderFileCard(file){
     }
 }
 
-// Funções de Drag & Drop (Mantidas, mas operam em filesToDisplay)
-function makeCardsDraggable(){
-    const cards = pdfGrid.querySelectorAll('.pdf-card');
-    cards.forEach(card=>{
-        card.ondragstart = e=>{
-            e.dataTransfer.setData('text/plain', String(card.dataset.id));
-            try{ e.dataTransfer.effectAllowed = 'move'; }catch(e){}
-            card.classList.add('dragging');
-        };
-        card.ondragend = ()=>{
-            card.classList.remove('dragging');
-        };
-    });
-
-    pdfGrid.ondragover = e=>{ e.preventDefault(); };
-    pdfGrid.ondrop = e=>{
-        e.preventDefault();
-        const draggedId = e.dataTransfer.getData('text/plain');
-        const draggedElement = document.querySelector(`.pdf-card[data-id="${draggedId}"]`);
-        if(!draggedElement) return;
-
-        // === CORREÇÃO AQUI: usa elementFromPoint para identificar corretamente o card alvo mesmo se o cursor estiver sobre canvas/textos internos ===
-        let target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.pdf-card');
-
-        // Proteção: se o drop ocorrer sobre os botões de ação, ignorar e manter a ordem atual
-        if (target && target.querySelector('.pdf-actions')?.contains(e.target)) {
-            // apenas re-renderiza a ordem para garantir consistência
-            renderAll();
-            syncOrder();
-            return;
-        }
-
-        if (!target || draggedElement === target) { 
-            // se não houver target (drop em área vazia) ou alvo igual ao arrastado, move para fim
-            if (target && draggedElement === target) return; 
-            pdfGrid.appendChild(draggedElement);
-            syncOrder();
-            return;
-        }
-
-        const allCards = Array.from(pdfGrid.querySelectorAll('.pdf-card'));
-        const draggedIndex = allCards.indexOf(draggedElement);
-        const targetIndex = allCards.indexOf(target);
-
-        if(draggedIndex < targetIndex){
-            pdfGrid.insertBefore(draggedElement, target.nextSibling);
-        }else{
-            pdfGrid.insertBefore(draggedElement, target);
-        }
-        syncOrder();
-    };
-}
-
-function syncOrder(){
-    const ids = [...pdfGrid.querySelectorAll('.pdf-card')].map(n=>n.dataset.id);
-    
-    // Ordena filesToDisplay com base na ordem dos cards no DOM
-    const newFilesToDisplay = [];
-    ids.forEach(id => {
-        const file = filesToDisplay.find(p => String(p.id) === String(id));
-        if (file) {
-            newFilesToDisplay.push(file);
-        }
-    });
-    
-    filesToDisplay = newFilesToDisplay;
-    updateStats();
-    saveStateToDB(); 
-}
-
 function updateStats(){
     const pdfFiles = filesToDisplay.filter(f => f.fileType === 'pdf');
     const dataFiles = filesToDisplay.filter(f => SUPPORTED_DATA_TYPES.includes(`.${f.fileType}`));
-
     const hasPdfs = pdfFiles.length > 0;
     const hasData = extractedTableData.length > 0;
     const hasFilesOrData = hasPdfs || dataFiles.length > 0 || hasData;
 
-    // Apenas habilita merge se houver PDFs com buffer (recarregados)
-    const canMerge = pdfFiles.length > 0 && pdfFiles.every(p => p.buffer !== null); 
-    mergeBtn.disabled = !canMerge;
+    // Estatísticas PDF
+    const totalPages = pdfFiles.reduce((acc, f) => acc + (f.pageIndices ? f.pageIndices.length : f.pageCount || 0), 0);
+    const totalSize = pdfFiles.reduce((acc, f) => acc + (f.size || 0), 0);
     
+    // Estatísticas Dados
+    const totalDataLines = extractedTableData.length;
+
+    document.getElementById('statFiles').textContent = filesToDisplay.length;
+    document.getElementById('statPages').textContent = totalPages;
+    document.getElementById('statSize').textContent = formatSize(totalSize);
+    document.getElementById('statDataLines').textContent = totalDataLines;
+
+    document.getElementById('statDataLinesWrapper').style.display = totalDataLines > 0 ? 'block' : 'none';
+    document.getElementById('statsBar').style.display = hasFilesOrData ? 'flex' : 'none';
+
+    // Controle de botões
+    const canMerge = pdfFiles.length > 0 && pdfFiles.every(p => p.buffer !== null);
+    mergeBtn.disabled = !canMerge;
     clearBtn.disabled = !hasFilesOrData;
     reverseBtn.disabled = !hasPdfs;
-    
+
     // V9 FIX: Habilita o botão de exportação se houver dados OU se houver PDFs para extrair
-    const canExtract = pdfFiles.length > 0 && pdfFiles.every(p => p.buffer !== null);
-    exportBtn.disabled = !(hasData || canExtract); 
-
-    if(hasFilesOrData){
-        document.getElementById('statsBar').style.display = 'flex';
-        
-        // 1. Arquivos Carregados (Total)
-        document.getElementById("statFiles").textContent = filesToDisplay.length;
-
-        // 2. Páginas PDF Total
-        const totalPdfPages = pdfFiles.reduce((sum, p) => sum + (p.pageIndices ? p.pageIndices.length : p.pageCount), 0);
-        document.getElementById("statPages").textContent = totalPdfPages;
-        
-        // 3. Linhas de Dados
-        const dataLinesWrapper = document.getElementById("statDataLinesWrapper");
-        const dataLines = extractedTableData.length;
-        document.getElementById("statDataLines").textContent = dataLines;
-        dataLinesWrapper.style.display = dataLines > 0 ? 'block' : 'none';
-
-        // 4. Tamanho PDF (0 se houver PDFs mas sem buffer)
-        const totalSize = pdfFiles.reduce((sum,p)=>sum+(p.buffer ? p.size : 0),0);
-        document.getElementById("statSize").textContent = formatSize(totalSize);
-    }else{
-        document.getElementById('statsBar').style.display = 'none';
-        if (document.getElementById("statDataLinesWrapper")) {
-            document.getElementById("statDataLinesWrapper").style.display = 'none';
-        }
-    }
-    
-    // Atualização dos botões Undo/Redo (mantida)
-    if (undoBtn && redoBtn) {
-        if (history.length > 0) {
-            undoBtn.disabled = historyPointer <= 0;
-            redoBtn.disabled = historyPointer >= history.length - 1;
-        } else {
-            undoBtn.disabled = true;
-            redoBtn.disabled = true;
-        }
-    }
+    const canExtract = pdfFiles.length > 0 || hasData;
+    exportBtn.disabled = !canExtract;
 }
 
-// *** Funções de Ações (Atualizadas) ***
 
-clearBtn.onclick = ()=>{ 
-    filesToDisplay=[]; 
-    extractedTableData = []; 
+// *** Funções de Ações (Atualizadas) ***
+clearBtn.onclick = ()=>{
+    filesToDisplay=[];
+    extractedTableData = [];
     history = [];
     historyPointer = -1;
     initialEditorState = [];
-    renderAll(); 
-    updateStats(); 
-    saveStateToDB(); 
-    restoreNotice.style.display = 'none'; 
-    openModal('Lista de arquivos e dados limpa', "Sucesso", "✅"); 
+    renderAll();
+    updateStats();
+    saveStateToDB();
+    restoreNotice.style.display = 'none';
+    openModal('Lista de arquivos e dados limpa', "Sucesso", "✅");
 };
 
-reverseBtn.onclick = ()=>{ 
-    filesToDisplay.reverse(); 
-    renderAll(); 
-    updateStats(); 
-    saveStateToDB(); 
-    openModal('Ordem dos arquivos invertida', "Sucesso", "🔄"); 
+reverseBtn.onclick = ()=>{
+    filesToDisplay.reverse();
+    renderAll();
+    updateStats();
+    saveStateToDB();
+    openModal('Ordem dos arquivos invertida', "Sucesso", "🔄");
 };
 
-function removeFileById(id){ 
+function removeFileById(id){
     const file = filesToDisplay.find(f => String(f.id) === String(id));
     if (!file) return;
 
-    filesToDisplay = filesToDisplay.filter(f=>String(f.id)!==String(id)); 
-    
+    filesToDisplay = filesToDisplay.filter(f=>String(f.id)!==String(id));
+
     // Se for um arquivo de dados, remove as entradas correspondentes do extractedTableData
     if (file.fileType !== 'pdf') {
         const fileTag = `[${file.fileType.toUpperCase()}] ${file.name}`;
         extractedTableData = extractedTableData.filter(d => d.fileName !== fileTag);
     }
     
-    renderAll(); 
-    updateStats(); 
-    saveStateToDB(); 
+    // Além disso, se o arquivo era um PDF e extraiu dados, remove-os também
+    if (file.fileType === 'pdf') {
+        extractedTableData = extractedTableData.filter(d => d.fileName !== file.name);
+    }
+
+
+    // Limpa histórico do editor e re-inicializa
+    history = [];
+    historyPointer = -1;
+    initialEditorState = deepCloneArray(extractedTableData); // O estado inicial deve ser o novo extractedTableData
+
+    renderAll();
+    updateStats();
+    saveStateToDB();
     openModal(`Arquivo ${file.name} removido`, "Sucesso", "🗑️");
 }
 
+
 // --- Funções de Seleção de Páginas (Apenas para PDFs, usando filesToDisplay) ---
-let currentEditId = null; 
+let currentEditId = null;
+
+function parsePageRange(rangeStr, maxPages) {
+    const indices = new Set();
+    const parts = rangeStr.split(',').map(p => p.trim()).filter(p => p.length > 0);
+
+    for (const part of parts) {
+        if (part.includes('-')) {
+            const [startStr, endStr] = part.split('-').map(s => s.trim());
+            const start = parseInt(startStr, 10);
+            const end = parseInt(endStr, 10);
+
+            if (isNaN(start) || isNaN(end) || start < 1 || end < 1 || start > maxPages || end > maxPages || start > end) {
+                return null; // Erro de formato ou fora do limite
+            }
+
+            for (let i = start; i <= end; i++) {
+                indices.add(i - 1);
+            }
+        } else {
+            const page = parseInt(part, 10);
+            if (isNaN(page) || page < 1 || page > maxPages) {
+                return null; // Erro de formato ou fora do limite
+            }
+            indices.add(page - 1);
+        }
+    }
+
+    // Retorna a lista de índices (base 0), ordenada para consistência
+    return Array.from(indices).sort((a, b) => a - b);
+}
 
 function openRangeModal(id){
     currentEditId = String(id);
@@ -1105,9 +1137,11 @@ function openRangeModal(id){
     let rangeString = "";
     if (file.pageIndices) {
         const indices = file.pageIndices.map(i => i + 1).sort((a, b) => a - b);
+        
         if (indices.length > 0) {
             let start = indices[0];
             let end = indices[0];
+
             for (let i = 1; i < indices.length; i++) {
                 if (indices[i] === end + 1) {
                     end = indices[i];
@@ -1119,54 +1153,26 @@ function openRangeModal(id){
             }
             rangeString += (start === end ? start : `${start}-${end}`);
         }
-    } else {
+    } else if (file.pageCount > 0) {
         rangeString = `1-${file.pageCount}`;
     }
-    
+
     rangeInput.value = rangeString;
     document.getElementById('rangeModal').style.display='flex';
-}
-
-function parsePageRange(range, maxPages){
-    const indices = new Set(); 
-    const parts = range.split(',').map(p => p.trim()).filter(p => p); 
-
-    for(const part of parts){
-        if(part.includes('-')){
-            const [startStr, endStr] = part.split('-').map(s => s.trim());
-            const start = parseInt(startStr);
-            const end = parseInt(endStr);
-            
-            if(isNaN(start) || isNaN(end) || start < 1 || end > maxPages || start > end){
-                return null; 
-            }
-
-            for(let i=start; i<=end; i++){
-                indices.add(i - 1); 
-            }
-
-        } else {
-            const page = parseInt(part);
-            if(isNaN(page) || page < 1 || page > maxPages){
-                return null; 
-            }
-            indices.add(page - 1); 
-        }
-    }
-    return Array.from(indices).sort((a, b) => a - b);
 }
 
 async function applyPageRange(){
     const file = filesToDisplay.find(f=>String(f.id)===String(currentEditId));
     if(!file || file.fileType !== 'pdf') return;
-    
+
     const range = rangeInput.value.trim();
+
     if(!range) {
-        file.pageIndices = null; 
+        file.pageIndices = null;
         closeRangeModal();
         renderAll();
         updateStats();
-        saveStateToDB(); 
+        saveStateToDB();
         return;
     }
 
@@ -1178,16 +1184,14 @@ async function applyPageRange(){
     }
 
     file.pageIndices = newIndices;
-
     closeRangeModal();
     renderAll();
     updateStats();
-    saveStateToDB(); 
+    saveStateToDB();
     openModal(`Páginas de "${file.name}" atualizadas. ${newIndices.length} página(s) selecionada(s).`, "Sucesso", "✅");
 }
 
 // --- Funções de Combinação (Merge) (Atualizadas para filesToDisplay) ---
-
 mergeBtn.onclick = mergePDFs;
 
 async function mergePDFs(){
@@ -1197,7 +1201,7 @@ async function mergePDFs(){
         openModal("Por favor, recarregue os PDFs (buffer perdido) para combinar. O aviso amarelo na tela indica quais arquivos precisam ser recarregados.", "Arquivos Ausentes", "❌");
         return;
     }
-    
+
     mergeBtn.innerHTML = '<span>⏳</span> Combinando...';
     mergeBtn.disabled = true;
 
@@ -1205,99 +1209,88 @@ async function mergePDFs(){
         const merged = await PDFDocument.create();
 
         for(const file of pdfFiles){
-            const fresh = cloneUint8(file.buffer); 
+            const fresh = cloneUint8(file.buffer);
             let indices = file.pageIndices || [...Array(file.pageCount).keys()];
 
             if (file.restricted) {
+                // Rasterização para PDFs restritos
                 const pdfjsDoc = await pdfjsLib.getDocument({data: fresh}).promise;
                 
                 for (const pageIndex of indices) {
-                    const page = await pdfjsDoc.getPage(pageIndex + 1); 
-
+                    const page = await pdfjsDoc.getPage(pageIndex + 1);
                     const viewport = page.getViewport({ scale: 1.5 });
+                    
                     const canvas = document.createElement("canvas");
                     canvas.width = viewport.width;
                     canvas.height = viewport.height;
                     const canvasContext = canvas.getContext("2d");
                     await page.render({ canvasContext, viewport }).promise;
 
-                    const [pageWidth, pageHeight] = A4_DIMENSIONS; 
+                    const [pageWidth, pageHeight] = A4_DIMENSIONS;
                     const mergedPage = merged.addPage([pageWidth, pageHeight]);
-
-                    const imagePng = await merged.embedPng(canvas.toDataURL('image/png'));
-                    const { width: imgWidth, height: imgHeight } = imagePng;
-
-                    const scaleFactor = Math.min(pageWidth / imgWidth, pageHeight / imgHeight);
-                    const finalWidth = imgWidth * scaleFactor;
-                    const finalHeight = imgHeight * scaleFactor;
-
-                    const x = (pageWidth - finalWidth) / 2;
-                    const y = (pageHeight - finalHeight) / 2;
                     
-                    mergedPage.drawImage(imagePng, {
-                        x: x,
-                        y: y,
-                        width: finalWidth,
-                        height: finalHeight
-                    });
+                    // Coloca a imagem do canvas no centro da página A4
+                    const image = await merged.embedPng(canvas.toDataURL());
+                    const scaleFactor = Math.min(pageWidth / image.width, pageHeight / image.height) * 0.95; 
+                    const imageWidth = image.width * scaleFactor;
+                    const imageHeight = image.height * scaleFactor;
+                    
+                    const x = (pageWidth - imageWidth) / 2;
+                    const y = (pageHeight - imageHeight) / 2;
+                    
+                    mergedPage.drawImage(image, { x, y, width: imageWidth, height: imageHeight });
                 }
-            } else { 
-                const pdf = await PDFDocument.load(fresh);
-                const pdfIndices = indices.filter(i => i < pdf.getPageCount()); 
-                const pages = await merged.copyPages(pdf, pdfIndices);
-                pages.forEach(p => merged.addPage(p));
+            } else {
+                // Cópia padrão para PDFs normais
+                const pdfDoc = await PDFDocument.load(fresh);
+                const pages = await merged.copyPages(pdfDoc, indices);
+                pages.forEach(page => merged.addPage(page));
             }
         }
         
-        if (merged.getPageCount() === 0) {
-            throw new Error("Nenhuma página válida para combinar.");
-        }
-
         const bytes = await merged.save();
-        const blob = new Blob([bytes],{type:"application/pdf"});
+        const blob = new Blob([bytes], {type:'application/pdf'});
         const url = URL.createObjectURL(blob);
-
-        const timestamp = new Date().toISOString().slice(0,10);
-        const filename = `PDF_Combinado_${timestamp}.pdf`;
 
         const a = document.createElement("a");
         a.href = url;
-        a.download = filename;
+        a.download = "PDF_Combinado_" + new Date().toISOString().slice(0, 10) + ".pdf";
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-
         URL.revokeObjectURL(url);
-        
+
         openModal(`PDF combinado com sucesso!\n${pdfFiles.length} arquivos • ${merged.getPageCount()} páginas`,"Sucesso","✅");
 
     }catch(e){
         console.error('Erro ao combinar:', e);
         openModal(`Erro ao combinar PDFs: ${e.message || 'Verifique o console para detalhes.'}`,"Erro","❌");
     }finally{
-        mergeBtn.innerHTML = '<span>✨</span> Combinar PDFs';
+        mergeBtn.innerHTML = '<span>✨</span> Combinar só PDFs';
         mergeBtn.disabled = false;
     }
 }
 
-
 // --- Prévia e Edição (Editor Modal) (Atualizado para filesToDisplay) ---
-
 /**
- * Funções de Extração de Texto para o Editor 
+ * Funções de Extração de Texto para o Editor
  */
 async function extractTextFromPage(pdfjsDoc, pageIndex, fileName){
     try {
         const page = await pdfjsDoc.getPage(pageIndex + 1);
         const textContent = await page.getTextContent();
+
         let lastY = Infinity;
         const text = textContent.items.map(item => {
             const str = item.str;
             let result = str;
+
+            // Lógica simples para forçar quebra de linha quando a posição Y muda muito
             if (lastY !== Infinity && (lastY - item.transform[5]) > (item.height * 2)) {
                 result = '\n' + result;
             }
-            lastY = item.transform[5]; 
+            lastY = item.transform[5];
+            
             return result;
         }).join(' ').replace(/\s{2,}/g, ' ').trim();
 
@@ -1327,7 +1320,6 @@ async function extractAllText() {
 
         try {
             const pdfjsDoc = await pdfjsLib.getDocument({ data: cloneUint8(file.buffer) }).promise;
-            
             const pagesToProcess = file.pageIndices || Array.from({ length: file.pageCount }, (_, i) => i);
 
             for (const pageIndex of pagesToProcess) {
@@ -1348,56 +1340,61 @@ async function extractAllText() {
  */
 async function previewData(){
     const pdfFilesWithBuffer = filesToDisplay.filter(f => f.fileType === 'pdf' && f.buffer !== null);
-    const dataFilesExist = filesToDisplay.filter(f => f.fileType !== 'pdf').length > 0;
-
-    if (pdfFilesWithBuffer.length === 0 && extractedTableData.length === 0 && !dataFilesExist) {
-        openModal("Nenhum arquivo carregado para prévia/edição.", "Aviso", "⚠️");
+    const dataFiles = filesToDisplay.filter(f => SUPPORTED_DATA_TYPES.includes(`.${f.fileType}`));
+    
+    if (pdfFilesWithBuffer.length === 0 && dataFiles.length === 0) {
+        openModal("Nenhum PDF carregado com buffer ou arquivo de dados para processar.", "Nenhum Conteúdo", "❌");
         return;
     }
+
+    // 1. Extrair de todos os PDFs com buffer
+    let extractedFromPdfs = await extractAllText();
     
-    // Extrai o texto dos PDFs que estão carregados (têm buffer)
-    let extractedFromPdfs = [];
-    if (pdfFilesWithBuffer.length > 0) {
-        extractedFromPdfs = await extractAllText();
-    }
-    
+    // 2. Mesclar com o estado persistente
+    // Filtra dados de PDF do estado persistente (para manter edições)
     const currentPdfData = extractedTableData.filter(d => !SUPPORTED_DATA_TYPES.some(ext => d.fileName.includes(`[${ext.toUpperCase().substring(1)}]`)));
+    // Filtra dados externos do estado persistente
     const externalData = extractedTableData.filter(d => SUPPORTED_DATA_TYPES.some(ext => d.fileName.includes(`[${ext.toUpperCase().substring(1)}]`)));
 
+    // Cria um mapa dos novos dados extraídos dos PDFs para fácil comparação
     const newExtractedMap = new Map();
     extractedFromPdfs.forEach(d => {
-        const originalFileName = d.fileName.replace(/ \(\d+\)$/, '');
-        newExtractedMap.set(originalFileName + d.pageNumber, d);
+        // Usa o nome do arquivo e o número da página como chave
+        newExtractedMap.set(d.fileName + d.pageNumber, d);
     });
 
+    // Filtra dados de PDF persistentes que ainda existem nos arquivos carregados
     const persistentPdfData = currentPdfData.filter(d => {
-        const originalFileName = d.fileName.replace(/ \(\d+\)$/, '');
-        const key = originalFileName + d.pageNumber;
+        const key = d.fileName + d.pageNumber;
         return newExtractedMap.has(key);
     });
 
+    // Combina: Novos dados extraídos (prioridade) + Dados externos persistentes
+    // Nota: O `newExtractedMap` já contém a versão mais recente de todos os dados de PDF
     const combinedData = Array.from(newExtractedMap.values()).concat(externalData);
 
+    // Re-ordena (PDFs primeiro, depois dados externos, ordenados por nome/página)
     extractedTableData = combinedData.sort((a, b) => {
         const aIsPdf = !SUPPORTED_DATA_TYPES.some(ext => a.fileName.includes(`[${ext.toUpperCase().substring(1)}]`));
-        const bIsPdf = !aIsPdf;
-        
+        // CORREÇÃO: TROCADO 'SUPPORTed_DATA_TYPES' para 'SUPPORTED_DATA_TYPES'
+        const bIsPdf = !SUPPORTED_DATA_TYPES.some(ext => b.fileName.includes(`[${ext.toUpperCase().substring(1)}]`));
+
         if (aIsPdf && !bIsPdf) return -1;
         if (!aIsPdf && bIsPdf) return 1;
+        
         return a.fileName.localeCompare(b.fileName) || a.pageNumber - b.pageNumber;
     });
 
-    
     if (extractedTableData.length === 0) {
         openModal("Nenhuma página com texto foi extraída e nenhum dado externo foi importado.", "Erro na Extração", "❌");
         return;
     }
     
+    // Zera o histórico de edição e salva o estado atual como inicial
+    history = [];
+    historyPointer = -1;
     initialEditorState = deepCloneArray(extractedTableData);
-    
-    if (history.length === 0) {
-        saveHistory(true); 
-    }
+    saveHistory(true); // Salva o primeiro estado na história
     
     renderEditorTable();
     editorModal.style.display = 'flex';
@@ -1406,10 +1403,12 @@ async function previewData(){
 // Funções do Editor Modal (Mantidas)
 function renderEditorTable(){
     editorTableBody.innerHTML = '';
+    updateHistoryButtons();
+    updateDeleteButtonState(); // Garante o estado correto ao renderizar
     
     if (extractedTableData.length === 0) {
         editorTableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; padding: 20px;">Nenhum dado para edição.</td></tr>';
-        deleteRowsBtn.disabled = true; 
+        deleteRowsBtn.disabled = true;
         selectAllRows.checked = false;
         return;
     }
@@ -1428,81 +1427,108 @@ function renderEditorTable(){
 
         const cellText = row.insertCell();
         cellText.setAttribute('contenteditable', 'true');
-        cellText.innerHTML = escapeHtml(item.text); 
-        cellText.onblur = handleInlineEdit;
-        cellText.oninput = handleInlineInput;
+        cellText.innerHTML = escapeHtml(item.text); // Usa innerHTML e escapeHtml
+        cellText.onblur = (e) => {
+            const newText = e.target.textContent;
+            if (item.text !== newText) {
+                item.text = newText;
+                saveHistory();
+                saveStateToDB();
+            }
+        };
+        // Adiciona um listener para a tecla 'Enter' para evitar a criação de novos blocos HTML
+        cellText.onkeydown = (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault(); 
+                e.target.blur(); // Perde o foco e dispara o onblur
+            }
+        };
     });
-
-    updateDeleteButtonState();
-    updateStats(); 
 }
-function handleInlineEdit(e){
-    const newText = e.target.textContent;
-    const itemId = e.target.parentNode.dataset.id;
-    const item = extractedTableData.find(d => String(d.id) === String(itemId));
 
-    if (item && item.text !== newText) {
-        item.text = newText;
-        saveHistory(); 
-        saveStateToDB(); 
-        e.target.innerHTML = escapeHtml(newText);
-    }
-}
-function handleInlineInput(e) { /* onblur funciona */ }
 function saveHistory(isInitial = false) {
-    if (!isInitial && historyPointer < history.length - 1) {
-        history = history.slice(0, historyPointer + 1);
+    const currentState = deepCloneArray(extractedTableData);
+    
+    if (!isInitial) {
+        // Limpa o 'futuro' se estivermos desfazendo e o usuário fizer uma nova alteração
+        if (historyPointer < history.length - 1) {
+            history.splice(historyPointer + 1);
+        }
     }
-    const stateCopy = deepCloneArray(extractedTableData);
-    history.push(stateCopy);
-    if (history.length > MAX_HISTORY) {
+    
+    if (history.length >= MAX_HISTORY) {
         history.shift();
+    } else if (!isInitial) {
+        historyPointer++;
     }
-    historyPointer = history.length - 1; 
-    updateStats(); 
+    
+    history.push(currentState);
+    historyPointer = history.length - 1;
+
+    updateHistoryButtons();
 }
-undoBtn.onclick = function() {
+
+undoBtn.onclick = () => {
     if (historyPointer > 0) {
         historyPointer--;
         extractedTableData = deepCloneArray(history[historyPointer]);
         renderEditorTable();
-        saveStateToDB(); 
+        saveStateToDB();
     }
-    updateStats();
+    updateHistoryButtons();
 };
-redoBtn.onclick = function() {
+
+redoBtn.onclick = () => {
     if (historyPointer < history.length - 1) {
         historyPointer++;
         extractedTableData = deepCloneArray(history[historyPointer]);
         renderEditorTable();
-        saveStateToDB(); 
+        saveStateToDB();
     }
-    updateStats();
+    updateHistoryButtons();
 };
-deleteRowsBtn.onclick = function() { 
-    const selectedIds = [];
-    editorTableBody.querySelectorAll('.row-checkbox:checked').forEach(cb => {
-        selectedIds.push(String(cb.dataset.id));
-    });
 
-    if (selectedIds.length > 0) {
-        extractedTableData = extractedTableData.filter(item => !selectedIds.includes(String(item.id)));
-        saveHistory(); 
-        saveStateToDB(); 
-        renderEditorTable(); 
-        openModal(`${selectedIds.length} linha(s) excluída(s).`, "Sucesso", "✅");
+function updateHistoryButtons() {
+    if (undoBtn && redoBtn) {
+        if (history.length > 0) {
+            undoBtn.disabled = historyPointer <= 0;
+            redoBtn.disabled = historyPointer >= history.length - 1;
+        } else {
+            undoBtn.disabled = true;
+            redoBtn.disabled = true;
+        }
     }
+}
+
+deleteRowsBtn.onclick = () => {
+    const checkboxes = editorTableBody.querySelectorAll('.row-checkbox:checked');
+    const idsToDelete = Array.from(checkboxes).map(cb => cb.dataset.id);
+
+    if (idsToDelete.length === 0) return;
+
+    // Filtra os dados removendo as linhas selecionadas
+    extractedTableData = extractedTableData.filter(item => !idsToDelete.includes(String(item.id)));
+
+    // Salva o novo estado na história e no DB
+    saveHistory();
+    saveStateToDB();
+    
+    // Re-renderiza a tabela
+    renderEditorTable();
+    updateStats();
+    openModal(`${idsToDelete.length} linha(s) excluída(s).`, "Exclusão", "🗑️");
 };
+
 function updateDeleteButtonState() {
     if (!editorTableBody || !deleteRowsBtn || !selectAllRows) {
         return;
     }
-    
     const checkboxes = editorTableBody.querySelectorAll('.row-checkbox');
     let selectedCount = 0;
+    
     checkboxes.forEach(cb => {
         const row = document.getElementById(`row-${cb.dataset.id}`);
-        if (row) { 
+        if (row) {
             if (cb.checked) {
                 selectedCount++;
                 row.classList.add('row-selected');
@@ -1515,6 +1541,7 @@ function updateDeleteButtonState() {
     deleteRowsBtn.disabled = selectedCount === 0;
     selectAllRows.checked = checkboxes.length > 0 && selectedCount === checkboxes.length;
 }
+
 selectAllRows.onclick = function() {
     const isChecked = this.checked;
     editorTableBody.querySelectorAll('.row-checkbox').forEach(cb => {
@@ -1524,7 +1551,6 @@ selectAllRows.onclick = function() {
 };
 
 // --- Funções de Exportação (Adicionado PDF) ---
-
 function startExport(format) {
     closeExportFormatModal();
 
@@ -1543,7 +1569,6 @@ function startExport(format) {
     const baseName = "Dados_Editados_" + new Date().toISOString().slice(0, 10);
 
     switch (format) {
-        
         // V10: Novo caso para exportação em PDF
         case 'pdf': {
             openModal("Gerando PDF... Esta operação pode levar alguns segundos.", "Aguarde", "⏳");
@@ -1551,7 +1576,6 @@ function startExport(format) {
                 try {
                     const pdfDoc = await PDFDocument.create();
                     const font = await pdfDoc.embedFont(PDFLib.StandardFonts.Helvetica);
-                    
                     const pageSize = PageSizes.A4;
                     const [pageWidth, pageHeight] = pageSize;
                     const margin = 50;
@@ -1560,69 +1584,91 @@ function startExport(format) {
                     const lineHeight = fontSize * 1.5;
                     const startY = pageHeight - margin;
 
+                    // --- FUNÇÃO CORRIGIDA PARA QUEBRA DE LINHA ---
+                    const splitTextIntoLines = (text, font, size, maxWidth) => {
+                        const lines = [];
+                        const paragraphs = text.split('\n'); // Trata quebras de linha explícitas (manualmente inseridas no editor)
+
+                        paragraphs.forEach(paragraph => {
+                            if (paragraph.trim() === '') {
+                                lines.push(''); // Mantém linhas vazias
+                                return;
+                            }
+                            
+                            const words = paragraph.split(' ');
+                            let currentLine = words[0] || '';
+                            
+                            for (let i = 1; i < words.length; i++) {
+                                const word = words[i];
+                                const testLine = currentLine + ' ' + word;
+                                
+                                // Se a linha de teste com a próxima palavra for maior ou igual ao limite
+                                if (font.widthOfTextAtSize(testLine, size) >= maxWidth) {
+                                    lines.push(currentLine); // Adiciona a linha atual
+                                    currentLine = word; // Começa uma nova linha com a palavra
+                                } else {
+                                    currentLine = testLine; // Continua a linha atual
+                                }
+                            }
+                            lines.push(currentLine); // Adiciona a última linha ou a única palavra
+                        });
+
+                        return lines;
+                    };
+                    // --- FIM DA FUNÇÃO CORRIGIDA ---
+
                     let currentPage = pdfDoc.addPage(pageSize);
                     let y = startY;
 
                     for (const item of data) {
-                        const header = `--- Arquivo: ${item.Arquivo} | Pág: ${item.Pagina} ---`;
-                        
-                        if (y < margin + lineHeight * 3) {
-                            currentPage = pdfDoc.addPage(pageSize);
-                            y = startY;
-                        }
-                        
-                        currentPage.drawText(header, {
-                            x: margin,
-                            y: y,
-                            size: fontSize + 2,
-                            font: font,
-                            color: PDFLib.rgb(0.1, 0.1, 0.5),
-                        });
-                        y -= lineHeight * 1.5;
+                        const header = `--- ${item.Arquivo} - Pág ${item.Pagina} ---`;
+                        // FIX APLICADO AQUI: Substituir o caractere bullet point (, • ou similar) por um asterisco
+                        // para evitar o erro de encoding WinAnsi da fonte Helvetica.
+                        const text = item.Conteudo.replace(/[\u0095\u2022\uF0B7]/g, '*');
 
-                        const textLines = item.Conteudo.split('\n');
-                        for (const line of textLines) {
-                            const wrappedText = font.splitTextIntoLines(line, {
-                                fontSize: fontSize,
-                                maxWidth: maxContentWidth,
-                            });
-                            
-                            for (const wrappedLine of wrappedText) {
-                                if (y < margin + lineHeight) {
+
+                        // Função para desenhar texto
+                        const drawText = (txt, color = PDFLib.rgb(0, 0, 0)) => {
+                            // Usa a função de quebra de linha corrigida
+                            const wrappedLines = splitTextIntoLines(txt, font, fontSize, maxContentWidth); 
+
+                            for (const wrappedLine of wrappedLines) {
+                                if (y < margin + lineHeight * 2) {
                                     currentPage = pdfDoc.addPage(pageSize);
                                     y = startY;
                                 }
-                                currentPage.drawText(wrappedLine, {
-                                    x: margin,
-                                    y: y,
-                                    size: fontSize,
-                                    font: font,
-                                    color: PDFLib.rgb(0, 0, 0),
-                                });
+                                currentPage.drawText(wrappedLine, { x: margin, y, size: fontSize, font, color });
                                 y -= lineHeight;
                             }
-                        }
+                        };
 
-                        y -= lineHeight * 2;
+                        // Desenha o cabeçalho
+                        if (y < startY) y -= lineHeight / 2; // Espaço antes do novo item
+                        drawText(header, PDFLib.rgb(0.4, 0.4, 0.4));
+                        y -= lineHeight;
+                        
+                        // Desenha o conteúdo
+                        drawText(text);
+
+                        y -= lineHeight; // Espaço após o item
                     }
 
-                    const pdfBytes = await pdfDoc.save();
-                    downloadFile(pdfBytes, baseName + ".pdf", "application/pdf");
-                    openModal(`Exportação para PDF concluída!`, "Sucesso", "✅");
+                    const bytes = await pdfDoc.save();
+                    downloadFile(bytes, baseName + ".pdf", 'application/pdf');
+                    openModal(`PDF de dados gerado com sucesso!`, "Sucesso", "✅");
 
                 } catch (e) {
-                    console.error('Erro ao exportar PDF:', e);
+                    console.error('Erro ao gerar PDF:', e);
                     openModal(`Erro ao gerar PDF: ${e.message}`, "Erro", "❌");
                 }
             }, 10);
             break;
         }
-
         case 'txt':
             content = data.map(d => `--- ${d.Arquivo} - Pág ${d.Pagina} ---\n${d.Conteudo}`).join('\n\n');
             mimeType = 'text/plain;charset=utf-8';
             filename = baseName + ".txt";
-            downloadFile(content, filename, mimeType);
+            downloadFile(content, filename, mimeType, true); // Adicionado BOM
             break;
         case 'json':
             content = JSON.stringify(data, null, 2);
@@ -1634,50 +1680,24 @@ function startExport(format) {
         case 'tsv': {
             const separator = format === 'csv' ? ',' : '\t';
             const headers = ['Arquivo', 'Pagina', 'Conteudo'];
-            
-            content = headers.join(separator) + '\n' + 
-                      data.map(row => 
-                          headers.map(header => {
-                              let value = String(row[header]).replace(/"/g, '""');
-                              if (value.includes(separator) || value.includes('\n') || value.includes('"')) {
-                                  value = `"${value}"`;
-                              }
-                              return value;
-                          }).join(separator)
-                      ).join('\n');
-            
+            content = headers.join(separator) + '\n' + data.map(row => headers.map(header => {
+                let value = String(row[header]).replace(/"/g, '""');
+                // Adicionado .replace(/\n/g, '\\n') para tratar quebras de linha em células CSV/TSV
+                if (value.includes(separator) || value.includes('\n') || value.includes('"')) {
+                    value = value.replace(/\n/g, '\\n'); // Substitui quebras de linha por \n literal na célula
+                    return `"${value}"`;
+                }
+                return value;
+            }).join(separator)).join('\n');
             mimeType = `text/${format === 'csv' ? 'csv' : 'tab-separated-values'};charset=utf-8`;
             filename = baseName + "." + format;
-            downloadFile(content, filename, mimeType, true); 
+            downloadFile(content, filename, mimeType, true); // Adicionado BOM
             break;
         }
         case 'html':
-            content = `
-                <!DOCTYPE html>
-                <html>
-                <head><title>Dados Exportados</title>
-                <style>table{border-collapse:collapse;width:100%;}th,td{border:1px solid #ddd;padding:8px;text-align:left;}th{background-color:#f2f2f2;}</style>
-                </head>
-                <body>
-                    <h2>Dados Extraídos e Editados</h2>
-                    <table>
-                        <thead>
-                            <tr><th>Arquivo</th><th>Página</th><th>Conteúdo</th></tr>
-                        </thead>
-                        <tbody>
-                            ${data.map(d => `<tr><td>${escapeHtml(d.Arquivo)}</td><td>${d.Pagina}</td><td>${escapeHtml(d.Conteudo).replace(/\n/g, '<br>')}</td></tr>`).join('')}
-                        </tbody>
-                    </table>
-                </body>
-                </html>
-            `;
-            mimeType = 'text/html;charset=utf-8';
-            filename = baseName + ".html";
-            downloadFile(content, filename, mimeType);
-            break;
         case 'doc':
             content = `
-                <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+                <html lang='pt-BR' xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
                 <head><meta charset='utf-8'><title>Documento</title>
                 <style>body{font-family: Arial, sans-serif;}table{border-collapse:collapse;width:100%;}th,td{border:1px solid #000;padding:8px;text-align:left;}th{background-color:#ccc;}</style>
                 </head>
@@ -1694,8 +1714,8 @@ function startExport(format) {
                 </body>
                 </html>
             `;
-            mimeType = 'application/msword';
-            filename = baseName + ".doc";
+            mimeType = format === 'html' ? 'text/html;charset=utf-8' : 'application/msword';
+            filename = baseName + "." + (format === 'html' ? 'html' : 'doc');
             downloadFile(content, filename, mimeType);
             break;
         case 'xlsx':
@@ -1707,7 +1727,6 @@ function startExport(format) {
 }
 
 loadStateFromDB(); // tenta restaurar estado ao carregar a página
-
 </script>
 </body>
 </html>
